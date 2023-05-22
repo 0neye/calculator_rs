@@ -35,6 +35,8 @@ const FUNCTION_ARG_COUNT: &[(&str, usize)] = &[
     ("abs", 1),
 ];
 
+/// Parses an expression with the given binary operators
+/// Calls the given function pointer when done
 fn parse_generic_bin_op<'a>(
     tokens: &'a Vec<Token>,
     pos: usize,
@@ -79,6 +81,10 @@ fn parse_generic_bin_op<'a>(
     Ok((node, new_pos))
 }
 
+fn parse_assignment<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
+    parse_generic_bin_op(tokens, pos, &["="], parse_add_sub)
+}
+
 fn parse_add_sub<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
     parse_generic_bin_op(tokens, pos, &["+", "-"], parse_mul_div)
 }
@@ -103,7 +109,7 @@ fn parse_function<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, u
                 args.push(Node::Number(num));
             }
         }
-        //or if it's the root function
+        // or if it's the root function
         else if name == "root" {
             if let Token::NUMBER(num) = &tokens[new_pos] {
                 new_pos += 1;
@@ -243,13 +249,20 @@ fn parse_atom<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize
     Err("Expected number or opening parenthesis".to_string())
 }
 
+/// Basically just gives parse_assignment a more understandable name
 fn parse_expression<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
-    parse_add_sub(tokens, pos)
+    parse_assignment(tokens, pos)
 }
 
+/// Root of the recursive parse tree
+/// Call order:
+/// parse -> parse_expression
+/// -> parse_assignment -> parse_add_sub
+/// -> parse_mul_div -> parse_pow
+/// -> parse_function -> parse_atom
 pub fn parse<'a>(tokens: &'a Vec<Token>) -> Result<Node<'a>, String> {
     let pos = 0;
-    match parse_expression(&tokens, pos) {
+    match parse_assignment(&tokens, pos) {
         Ok((node, next_pos)) => {
             if next_pos == tokens.len() - 1 {
                 return Ok(node);

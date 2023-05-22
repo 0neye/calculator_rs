@@ -1,12 +1,11 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 use std::str::FromStr;
-//use std::time::Instant;
 
 use malachite::num::arithmetic::traits::{Abs, Ceiling, Floor, Mod, Pow, Reciprocal};
 use malachite::num::conversion::string::options::ToSciOptions;
 use malachite::num::conversion::traits::ToSci;
 use malachite::num::logic::traits::SignificantBits;
-//use malachite::rounding_modes::RoundingMode;
+
 use malachite::{self, Integer, Natural, Rational};
 
 //wrapper
@@ -15,7 +14,6 @@ pub struct Fraction {
     value: Rational,
 }
 
-//implementing the Fraction struct
 impl Fraction {
     /// The constant pi.
     pub fn pi() -> Fraction {
@@ -62,7 +60,7 @@ impl Fraction {
         }
     }
 
-    //Parses a string in any form.
+    /// Parses a string in any (non-scientific) form
     pub fn parse(s: &str) -> Option<Fraction> {
         if s.contains('.') {
             return Fraction::parse_decimal(s);
@@ -73,7 +71,7 @@ impl Fraction {
         }
     }
 
-    /// Parses a string in decimal form.
+    /// Parses a string in decimal form
     pub fn parse_decimal(s: &str) -> Option<Fraction> {
         // if the string is empty
         if s.is_empty() {
@@ -87,11 +85,11 @@ impl Fraction {
             let length = s.len();
             // get the number of digits after the decimal point
             let digits_after_decimal = length - index - 1;
-            // get the numerator
+            // get the numerator (the number without the decimal point)
             let numerator = Integer::from_str(&s.replace('.', "")).unwrap();
-            // get the denominator
+            // get the denominator (10^number of places after the decimal)
             let denominator = Integer::from(10).pow(digits_after_decimal as u64);
-            // return the fraction
+            // return the fraction (it is automatically simplified)
             Some(Fraction::new_from_big_ints(&numerator, &denominator))
         } else {
             // if there is no decimal point
@@ -148,31 +146,31 @@ impl Fraction {
         self.value.div_assign(&other.value);
     }
 
-    // negate
+    /// Negates a fraction
     pub fn negate(&self) -> Fraction {
         Fraction {
             value: -(&self.value),
         }
     }
 
-    // clone
+    /// Clones a fraction
     pub fn clone(&self) -> Fraction {
         Fraction {
             value: self.value.clone(),
         }
     }
 
-    // numer
+    /// Numerator
     pub fn numer(&self) -> &Natural {
         self.value.numerator_ref()
     }
 
-    // denom
+    /// Denominator
     pub fn denom(&self) -> &Natural {
         self.value.denominator_ref()
     }
 
-    /// Gets the integer part of a Fraction.
+    /// Gets the integer part of a Fraction
     pub fn trunc(&self) -> Fraction {
         Fraction {
             value: if self > &Fraction::from(0) {
@@ -183,28 +181,30 @@ impl Fraction {
         }
     }
 
-    /// Gets the fractional part of a Fraction.
+    /// Gets the fractional part of a Fraction
     pub fn fract(&self) -> Fraction {
+        let is_neg = self.value < 0.0;
         Fraction {
             value: Rational::from_naturals_ref(&(self.numer().mod_op(self.denom())), self.denom()),
         }
+        .multiply(&Fraction::from(if is_neg { -1 } else { 1 }))
     }
 
-    /// Rounds towards negative infinity.
+    /// Rounds towards negative infinity
     pub fn floor(&self) -> Fraction {
         Fraction {
             value: (&self.value).floor().into(),
         }
     }
 
-    /// Rounds towards positive infinity.
+    /// Rounds towards positive infinity
     pub fn ceil(&self) -> Fraction {
         Fraction {
             value: (&self.value).ceiling().into(),
         }
     }
 
-    /// Rounds to the nearest integer.
+    /// Rounds to the nearest integer
     pub fn round(&self) -> Fraction {
         //to round a number, we add 0.5 and then truncate
         let sign = if self.value < 0.0 { -1 } else { 1 };
@@ -214,14 +214,14 @@ impl Fraction {
             .trunc()
     }
 
-    /// Gets the absolute value of a Fraction.
+    /// Gets the absolute value of a Fraction
     pub fn abs(&self) -> Fraction {
         Fraction {
             value: (&self.value).abs(),
         }
     }
 
-    // recip
+    /// Gets the reciprocal of a Fraction
     pub fn recip(&self) -> Fraction {
         Fraction {
             value: (&self.value).reciprocal(),
@@ -329,8 +329,13 @@ impl Fraction {
             //return -ln(-x)
             return Ok(self.negate().ln(precision)?.negate());
         }
+        // if it's less than 1, recurse; required to keep accuracy high
+        else if self.value < 1.0 {
+            //return -ln(1/x)
+            return Ok(self.recip().ln(precision)?.negate());
+        }
 
-        // break frac into a * 10^b or do Ln(a) + b * Ln(10) where b is the power of 10 to get a < 10
+        // break frac into a * 10^b or do Ln(a) + b * Ln(10) where b is the power of 10 to get a < ln10
         let mut frac = self.clone();
         let mut b = 0;
         if frac > Fraction::ln10() {
@@ -378,6 +383,15 @@ impl Fraction {
         let result = sum * Fraction::from(2) + Fraction::from(b).multiply(&Fraction::ln10());
 
         Ok(result.trimed(precision))
+    }
+
+    /// Takes the arbitrary-base log of a Fraction. <br>
+    /// Uses x = e^(Ln(x)/n).
+    pub fn log(&self, base: &Fraction, precision: u32) -> Result<Fraction, String> {
+        Ok(self
+            .ln(precision)?
+            .divide(&base.ln(precision)?)
+            .trimed(precision))
     }
 
     /// Gets the sine of a Fraction. <br>
@@ -455,8 +469,172 @@ impl Fraction {
         Ok(self.sin(precision)?.divide(&self.cos(precision)?))
     }
 
+    /// Gets the factorial of an integer in Fraction form.
+    pub fn factorial(&self) -> Result<Fraction, String> {
+        if self.value < 0.0 {
+            return Err(format!(
+                "Can't take the factorial of {}",
+                self.to_string_decimal(20)
+            ));
+        }
+        if self.denom() != &Natural::from(1u8) {
+            return Err(format!(
+                "Can't take the factorial of {} because it is not an integer",
+                self.to_string_decimal(20)
+            ));
+        }
+        let mut result = Fraction::from(1);
+        let mut i = Fraction::from(1);
+        while i <= *self {
+            result.mul_assign(&i);
+            i.add_assign(&Fraction::from(1));
+        }
+        Ok(result)
+    }
+
+    /// Gets the gamma function of a Fraction. <br>
+    /// Uses the taylor series from: https://github.com/microsoft/calculator/blob/main/src/CalcManager/Ratpack/fact.cpp
+    //      n
+    //     ___    2j
+    //   n \  ]  A       1          A
+    //  A   \   -----[ ---- - ---------------]
+    //      /   (2j)!  n+2j   (n+2j+1)(2j+1)
+    //     /__]
+    //     j=0
+    //
+    //  It can be shown that the above series is within precision if A is chosen
+    //  big enough.
+    //                          A    n  precision
+    //  Based on the relation ne  = A 10            A was chosen as
+    //
+    //             precision
+    //  A = ln(Base         /n)+1
+    //  A += n*ln(A)  This is close enough for precision > base and n < 1.5
+    //
+    //  self is n
+    fn gamma(&self, mut precision: u32) -> Result<Fraction, String> {
+        const BASE: u32 = 10u32;
+        const LN_PRECISION: u32 = 100u32; // ln is expensive so we use a fixed lower precision; doesn't affect the result
+        let original_precision = precision;
+
+        // get A
+        let mut a = Fraction::from(precision)
+            .divide(self)
+            .ln(LN_PRECISION)?
+            .multiply(&Fraction::from(BASE))
+            .added_to(&Fraction::from(1));
+        a.add_assign(&self.multiply(&a.ln(LN_PRECISION)?));
+        a.trim(precision);
+
+        // bump precision by ln(exp(a)*pow(a,n+1.5)-ln(BASE));
+        // using f64 because it's faster and we're truncating the result anyway
+        let a_f64 = f64::from_str(&a.to_string_decimal(20)).unwrap();
+        let bump = &a_f64.exp()
+            * a_f64.powf(
+                f64::from_str(&self.added_to(&Fraction::new(3, 2)).to_string_decimal(20)).unwrap(),
+            )
+            - f64::from(BASE).ln();
+        precision += bump.trunc().abs() as u32;
+
+        // set the stop conditions
+        const MAX_LOOP_TIMES: u64 = 500;
+        let STOP_AFTER = Fraction::from(BASE)
+            .pow_frac(&Fraction::from(precision).negate(), precision)?
+            .divide(&Fraction::from(BASE));
+
+        // first term (when j is 0)
+        let mut sum = self.recip() - &a / &(self + &Fraction::from(1));
+
+        let a_pow_2 = &a.multiply(&a);
+        let mut a_pow_j2 = a_pow_2.clone();
+        let mut j2_fact = Natural::from(2u8);
+
+        // loop until the sum converges
+        for j in 1..MAX_LOOP_TIMES {
+            let j2 = j * 2;
+            let n_plus_2j = self.added_to(&Fraction::from(j2));
+
+            // part1 = (a ^ (2 * j)) / ((2 * j)!)
+            let part1 = (&a_pow_j2 / &Fraction::from(&j2_fact)).trimed(precision);
+            // part2 = 1 / (n + 2 * j)
+            let part2 = n_plus_2j.recip();
+            // part3 = a / (n + 2 * j + 1) / (2 * j + 1)
+            let part3 = a
+                .divide(
+                    &n_plus_2j
+                        .added_to(&Fraction::from(1))
+                        .multiply(&Fraction::from(j2 + 1)),
+                )
+                .trimed(precision);
+            // term = part1 * (part2 - part3)
+            let term = &part1.multiply(&part2.subtract(&part3));
+
+            // add the term to the sum
+            sum.add_assign(term);
+            sum.trim(precision);
+
+            // if the precision is reached, break
+            if term.abs() < STOP_AFTER {
+                break;
+            }
+
+            // set up for the next loop
+            a_pow_j2.mul_assign(&a_pow_2);
+            a_pow_j2.trim(precision);
+            j2_fact *= Natural::from((j2 + 1) * (j2 + 2));
+        }
+
+        Ok(
+            // pow_frac uses ln; the '* 2' is pretty arbitrary but required
+            a.pow_frac(self, LN_PRECISION * 2)?
+                .multiply(&sum)
+                .trimed(original_precision),
+        )
+    }
+
+    /// Gets the factorial of a Fraction. <br>
+    /// Uses the gamma function.
+    /// Takes on average 100ms for precision 500.
+    pub fn fact_fraction(&self, precision: u32) -> Result<Fraction, String> {
+        // if the fraction is negative
+        if self.value < 0.0 {
+            //return -gamma(-x)
+            return Ok(-(-self.clone()).fact_fraction(precision)?);
+        }
+        // if it's an integer
+        if self.denom() == &Natural::from(1u8) {
+            //return x!
+            return Ok(self.factorial()?);
+        }
+
+        // scale down
+        // to the corresponding number between -1 and 0 that gives the same result
+        // no idea how they figured out these specific loops
+        let mut fact = Fraction::from(1);
+        let mut x = self.clone();
+        while x.value > 0.0 {
+            fact.mul_assign(&x);
+            x.sub_assign(&Fraction::from(1));
+        }
+        while x.value < -1.0 {
+            x.add_assign(&Fraction::from(1));
+            fact.div_assign(&x);
+        }
+
+        //dbg!(&fact.to_string_decimal(precision));
+        //dbg!(&x.to_string_decimal(precision));
+
+        let res = x
+            .added_to(&Fraction::from(1))
+            .gamma(precision)?
+            .multiply(&fact)
+            .trimed(precision);
+
+        Ok(res)
+    }
+
     /// Takes a Fraction to an integer power.
-    pub fn pow(&self, exponent: &Integer, precision: u32) -> Result<Fraction, String> {
+    fn pow(&self, exponent: &Integer, precision: u32) -> Result<Fraction, String> {
         // if the exponent is 0 or 1
         if exponent == &0 {
             return Ok(Fraction::from(1));
@@ -499,7 +677,9 @@ impl Fraction {
             }
             // return the trimed result
             Ok(result.trimed(precision))
-        } else {
+        }
+        // if it's too large
+        else {
             // uses x^y = e^(y*ln(x))
             Ok(self
                 .ln(precision)?
@@ -518,7 +698,7 @@ impl Fraction {
         Ok(self.ln(precision)?.divide(n).exp(precision)?)
     }
 
-    /// Takes one Fraction to the power of another Fraction. <br>
+    /// Takes one Fraction to the power of another Fraction.
     pub fn pow_frac(&self, exponent: &Fraction, precision: u32) -> Result<Fraction, String> {
         let p_less = precision / 5;
 
@@ -580,38 +760,6 @@ impl Fraction {
         Ok(int_part.multiply(&frac_part).trimed(precision))
     }
 
-    /// Takes the arbitrary-base log of a Fraction. <br>
-    /// Uses x = e^(Ln(x)/n).
-    pub fn log(&self, base: &Fraction, precision: u32) -> Result<Fraction, String> {
-        Ok(self
-            .ln(precision)?
-            .divide(&base.ln(precision)?)
-            .trimed(precision))
-    }
-
-    /// Gets the factorial of an integer in Fraction form.
-    pub fn factorial(&self) -> Result<Fraction, String> {
-        if self.value < 0.0 {
-            return Err(format!(
-                "Can't take the factorial of {}",
-                self.to_string_decimal(20)
-            ));
-        }
-        if self.denom() != &Natural::from(1u8) {
-            return Err(format!(
-                "Can't take the factorial of {} because it is not an integer",
-                self.to_string_decimal(20)
-            ));
-        }
-        let mut result = Fraction::from(1);
-        let mut i = Fraction::from(1);
-        while i <= *self {
-            result.mul_assign(&i);
-            i.add_assign(&Fraction::from(1));
-        }
-        Ok(result)
-    }
-
     /// Trims a fraction to a certain number of digits (where the min(numer, denom) becomes that number of digits long).
     #[inline]
     fn trim(&mut self, trim_to: u32) {
@@ -639,13 +787,13 @@ impl Fraction {
 
     /// Rounds a Fraction in-place if it's extremely close to the next integer that's not 0.
     pub fn round_if_close(&mut self) {
-        if self.trunc().value == 0.0 {
-            return;
-        }
-        let distance = Fraction::parse_decimal("0.00000000000000000000000001").unwrap();
-        let frac_part = self.fract();
+        // if self.trunc().value == 0.0 {
+        //     return;
+        // }
+        let distance = Fraction::parse_decimal("0.0000000000000000000000001").unwrap();
+        let frac_part = self.fract().abs();
         // if the fraction is less than the distance from the nearest integer
-        if frac_part < distance || frac_part > (Fraction::from(1) - distance) {
+        if frac_part < distance || frac_part > (&Fraction::from(1) - &distance) {
             self.value = self.round().value;
         }
     }
@@ -657,6 +805,8 @@ impl Fraction {
         new
     }
 
+    //TODO: add a version of a rounding function that rounds to the closest decimal digit (like if there's 10 9s or 0s in a row)
+
     /// Returns a string representation of the fraction in decimal form.
     pub fn to_string_decimal(&self, precision: u32) -> String {
         let mut options = ToSciOptions::default();
@@ -665,7 +815,7 @@ impl Fraction {
             self.value.to_sci_with_options(options).to_string()
         } else {
             let mut res = String::new();
-            if self < &Fraction::from(0) {
+            if self.value < 0.0 {
                 res += "-";
             }
             res += &self.trunc().numer().to_string();
@@ -705,17 +855,15 @@ impl Fraction {
 
     /// Returns a string representation of the fraction in scientific notation.
     pub fn to_string_scientific(&self, precision: u32) -> String {
-        // the difference from to_string_decimal is that it will always use scientific notation to 50 decimal places
+        // the difference from to_string_decimal is that it will always use scientific notation
         let mut options = ToSciOptions::default();
         options.set_precision(precision as u64);
-        if self.value.fmt_sci_valid(options) {
-            return self.value.to_sci_with_options(options).to_string();
-        }
-        options.set_precision(50);
+        options.set_neg_exp_threshold(-(precision as i64));
+        options.set_e_uppercase();
         if self.value.fmt_sci_valid(options) {
             self.value.to_sci_with_options(options).to_string()
         } else {
-            // if it's still not valid, use mixed number notation
+            // if it's not valid, use mixed number notation
             self.to_string_mixed(precision)
         }
     }
@@ -724,6 +872,13 @@ impl Fraction {
     pub fn to_string_p(&self, precision: u32) -> String {
         format!("{}", self.trimed(precision).value)
     }
+}
+
+/// Gets the number of decimal digits in a number. <br>
+/// Uses: number of decimal digits ~= floor( self.num_bytes * log(256) ) + 1
+#[inline]
+fn num_decimal_digits(num: &Natural) -> u32 {
+    ((num.significant_bits() as f64 / 8.0) * 2.408_239_965_311_849_6 + 1.0) as u32
 }
 
 //FromStr trait implementation
@@ -763,10 +918,20 @@ impl From<&Integer> for Fraction {
         Fraction::new_from_big_ints(n, &Integer::from(1))
     }
 }
+impl From<Integer> for Fraction {
+    fn from(n: Integer) -> Fraction {
+        Fraction::new_from_big_ints(&n, &Integer::from(1))
+    }
+}
 //from Natural
 impl From<&Natural> for Fraction {
     fn from(n: &Natural) -> Fraction {
         Fraction::new_from_big_ints(&Integer::from(n), &Integer::from(1))
+    }
+}
+impl From<Natural> for Fraction {
+    fn from(n: Natural) -> Fraction {
+        Fraction::new_from_big_ints(&Integer::from(&n), &Integer::from(1))
     }
 }
 //from Rational
@@ -874,11 +1039,440 @@ impl std::fmt::Display for Fraction {
     }
 }
 
-/// Gets the number of decimal digits in a number. <br>
-/// Uses: number of decimal digits ~= floor( self.num_bytes * log(256) ) + 1
-#[inline]
-fn num_decimal_digits(num: &Natural) -> u32 {
-    ((num.significant_bits() as f64 / 8.0) * 2.408_239_965_311_849_6 + 1.0) as u32
+// tests
+#[cfg(test)]
+mod tests {
+    use super::Fraction;
+    use malachite::Integer;
+    use malachite::Natural;
+    use malachite::Rational;
+
+    // test utilites
+    const TEST_PRECISION: u32 = 1000;
+    const TEST_ACCURACY_MIN: u32 = 30;
+
+    // if they are the same, return u32::MAX
+    fn first_difference_between_strings(a: String, b: String) -> u32 {
+        let mut i = 0;
+        for (x, y) in a.chars().zip(b.chars()) {
+            if x != y {
+                return i;
+            }
+            i += 1;
+        }
+        u32::MAX
+    }
+
+    // tests
+
+    #[test]
+    fn test_new() {
+        // 1/2
+        let a = Fraction::new(1, 2);
+        assert_eq!(a.value, Rational::from_signeds(1, 2));
+
+        // -1/2
+        let b = Fraction::new(1, -2);
+        assert_eq!(b.value, Rational::from_signeds(-1, 2));
+
+        // -1/2
+        let c = Fraction::new(-1, 2);
+        assert_eq!(c.value, Rational::from_signeds(-1, 2));
+
+        // 1/2
+        let d = Fraction::new(-1, -2);
+        assert_eq!(d.value, Rational::from_signeds(1, 2));
+    }
+
+    #[test]
+    fn test_new_from_big_ints() {
+        // 1/2
+        let a = Fraction::new_from_big_ints(&Integer::from(1), &Integer::from(2));
+        assert_eq!(a.value, Rational::from_signeds(1, 2));
+
+        // -1/2
+        let b = Fraction::new_from_big_ints(&Integer::from(1), &Integer::from(-2));
+        assert_eq!(b.value, Rational::from_signeds(-1, 2));
+
+        // -1/2
+        let c = Fraction::new_from_big_ints(&Integer::from(-1), &Integer::from(2));
+        assert_eq!(c.value, Rational::from_signeds(-1, 2));
+
+        // 1/2
+        let d = Fraction::new_from_big_ints(&Integer::from(-1), &Integer::from(-2));
+        assert_eq!(d.value, Rational::from_signeds(1, 2));
+    }
+
+    #[test]
+    fn test_new_from_naturals() {
+        // 1/2
+        let a = Fraction::new_from_big_naturals(&Natural::from(1u32), &Natural::from(2u32));
+        assert_eq!(a.value, Rational::from_signeds(1, 2));
+
+        // 5/2
+        let b = Fraction::new_from_big_naturals(&Natural::from(5u32), &Natural::from(2u32));
+        assert_eq!(b.value, Rational::from_signeds(5, 2));
+    }
+
+    #[test]
+    fn test_new_from_rational() {
+        // 1
+        let a = Fraction::from(&Rational::from(1));
+        assert_eq!(a.value, Rational::from(1));
+
+        // -1
+        let b = Fraction::from(&Rational::from(-1));
+        assert_eq!(b.value, Rational::from(-1));
+
+        // 1/2
+        let c = Fraction::from(&Rational::from_signeds(1, 2));
+        assert_eq!(c.value, Rational::from_signeds(1, 2));
+
+        // -1/2
+        let d = Fraction::from(&Rational::from_signeds(-1, 2));
+        assert_eq!(d.value, Rational::from_signeds(-1, 2));
+    }
+
+    #[test]
+    fn test_parse() {
+        // 1/2
+        let a = Fraction::parse("1/2").unwrap();
+        assert_eq!(a.value, Rational::from_signeds(1, 2));
+
+        // -1/2
+        let b = Fraction::parse("-1/2").unwrap();
+        assert_eq!(b.value, Rational::from_signeds(-1, 2));
+    }
+
+    #[test]
+    fn test_parse_decimal() {
+        // 0.5
+        let a = Fraction::parse_decimal("0.5").unwrap();
+        assert_eq!(a.value, Rational::from_signeds(1, 2));
+
+        // -0.5
+        let b = Fraction::parse_decimal("-0.5").unwrap();
+        assert_eq!(b.value, Rational::from_signeds(-1, 2));
+
+        // 2
+        let c = Fraction::parse_decimal("2").unwrap();
+        assert_eq!(c.value, Rational::from(2));
+
+        // -2
+        let d = Fraction::parse_decimal("-2").unwrap();
+        assert_eq!(d.value, Rational::from(-2));
+    }
+
+    #[test]
+    fn test_trunc() {
+        // trunc(1/2) = 0
+        let a = Fraction::parse("1/2").unwrap();
+        assert_eq!(a.trunc().numer(), &Natural::from(0u32));
+
+        // trunc(-1/2) = 0
+        let b = Fraction::parse("-1/2").unwrap();
+        assert_eq!(b.trunc().numer(), &Natural::from(0u32));
+
+        // trunc(3/2) = 1
+        let c = Fraction::parse("3/2").unwrap();
+        assert_eq!(c.trunc().numer(), &Natural::from(1u32));
+
+        // trunc(-3/2) = -1
+        let d = Fraction::parse("-3/2").unwrap();
+        assert_eq!(
+            Integer::from(d.trunc().numer()) * Integer::from(-1),
+            Integer::from(-1)
+        );
+    }
+
+    #[test]
+    fn test_fract() {
+        // fract(5/2) = 1/2
+        let a = Fraction::parse("5/2").unwrap();
+        assert_eq!(a.fract(), Fraction::parse("1/2").unwrap());
+
+        // fract(-5/2) = -1/2
+        let b = Fraction::parse("-5/2").unwrap();
+        assert_eq!(b.fract(), Fraction::parse("-1/2").unwrap());
+
+        // fract(1/2) = 1/2
+        let c = Fraction::parse("1/2").unwrap();
+        assert_eq!(c.fract(), Fraction::parse("1/2").unwrap());
+
+        // fract(-1/2) = -1/2
+        let d = Fraction::parse("-1/2").unwrap();
+        assert_eq!(d.fract(), Fraction::parse("-1/2").unwrap());
+    }
+
+    #[test]
+    fn test_floor() {
+        // floor(1/2) = 0
+        let a = Fraction::parse("1/2").unwrap();
+        assert_eq!(a.floor().numer(), &Natural::from(0u32));
+
+        // floor(-1/2) = -1
+        let b = Fraction::parse("-1/2").unwrap();
+        assert_eq!(
+            Integer::from(b.floor().numer()) * Integer::from(-1),
+            Integer::from(-1)
+        );
+
+        // floor(3/2) = 1
+        let c = Fraction::parse("3/2").unwrap();
+        assert_eq!(c.floor().numer(), &Natural::from(1u32));
+
+        // floor(-3/2) = -2
+        let d = Fraction::parse("-3/2").unwrap();
+        assert_eq!(
+            Integer::from(d.floor().numer()) * Integer::from(-1),
+            Integer::from(-2)
+        );
+    }
+
+    #[test]
+    fn test_ceil() {
+        // ceil(1/2) = 1
+        let a = Fraction::parse("1/2").unwrap();
+        assert_eq!(a.ceil().numer(), &Natural::from(1u32));
+
+        // ceil(-1/2) = 0
+        let b = Fraction::parse("-1/2").unwrap();
+        assert_eq!(b.ceil().numer(), &Natural::from(0u32));
+
+        // ceil(3/2) = 2
+        let c = Fraction::parse("3/2").unwrap();
+        assert_eq!(c.ceil().numer(), &Natural::from(2u32));
+
+        // ceil(-3/2) = -1
+        let d = Fraction::parse("-3/2").unwrap();
+        assert_eq!(
+            Integer::from(d.ceil().numer()) * Integer::from(-1),
+            Integer::from(-1)
+        );
+    }
+
+    #[test]
+    fn test_round() {
+        // round(1/2) = 1
+        let a = Fraction::parse("1/2").unwrap();
+        assert_eq!(a.round().numer(), &Natural::from(1u32));
+
+        // round(-1/2) = -1
+        let b = Fraction::parse("-1/2").unwrap();
+        assert_eq!(
+            Integer::from(b.round().numer()) * Integer::from(-1),
+            Integer::from(-1)
+        );
+
+        // round(3/2) = 2
+        let c = Fraction::parse("3/2").unwrap();
+        assert_eq!(c.round().numer(), &Natural::from(2u32));
+
+        // round(-3/2) = -2
+        let d = Fraction::parse("-3/2").unwrap();
+        assert_eq!(
+            Integer::from(d.round().numer()) * Integer::from(-1),
+            Integer::from(-2)
+        );
+    }
+
+    #[test]
+    fn test_abs() {
+        // abs(1/2) = 1/2
+        let a = Fraction::parse("1/2").unwrap();
+        assert_eq!(a.abs(), Fraction::parse("1/2").unwrap());
+
+        // abs(-1/2) = 1/2
+        let b = Fraction::parse("-1/2").unwrap();
+        assert_eq!(b.abs(), Fraction::parse("1/2").unwrap());
+    }
+
+    #[test]
+    fn test_recip() {
+        // recip(1/2) = 2/1
+        let a = Fraction::parse("1/2").unwrap();
+        assert_eq!(a.recip(), Fraction::parse("2/1").unwrap());
+
+        // recip(-1/2) = -2/1
+        let b = Fraction::parse("-1/2").unwrap();
+        assert_eq!(b.recip(), Fraction::parse("-2/1").unwrap());
+    }
+
+    #[test]
+    fn test_dif_strings() {
+        assert_eq!(
+            first_difference_between_strings("1234567890".to_string(), "1234567890".to_string()),
+            u32::MAX
+        );
+        assert_eq!(
+            first_difference_between_strings("1234567890".to_string(), "1234567891".to_string()),
+            9
+        );
+    }
+
+    #[test]
+    fn test_exp() {
+        // -exp(1/2) = 0.6065306597126334...
+        let a = Fraction::parse("-1/2").unwrap();
+        assert_eq!(first_difference_between_strings(a.exp(TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), 
+        "0.6065306597126334236037995349911804534419181354871869556828921587350565194137484239986476115079894560264237897940395251765378080".to_string()) >= TEST_ACCURACY_MIN, true);
+
+        // exp(3/2) = 1.6487212707001281...
+        let b = Fraction::parse("3/2").unwrap();
+        assert_eq!(first_difference_between_strings(b.exp(TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), 
+        "4.4816890703380648226020554601192758190057498683696670567726500827859366744667137729810538313824533913886163506518301957689627464".to_string()) >= TEST_ACCURACY_MIN, true);
+
+        // exp(5) = 148.4131591025766...
+        let c = Fraction::parse("5").unwrap();
+        assert_eq!(first_difference_between_strings(c.exp(TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), 
+        "148.41315910257660342111558004055227962348766759387898904675284511091206482095857607968840945989902114129280827066632605290992623".to_string()) >= TEST_ACCURACY_MIN, true);
+    }
+
+    #[test]
+    fn test_ln() {
+        // -ln(1/2) = 0.6931471805599453...
+        let a = Fraction::parse("-1/2").unwrap();
+        assert_eq!(first_difference_between_strings(a.ln(TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), 
+        "0.6931471805599453094172321214581765680755001343602552541206800094933936219696947156058633269964186875420014810205706857336855202".to_string()) >= TEST_ACCURACY_MIN, true);
+
+        // ln(3/2) = 0.4054651081081644...
+        let b = Fraction::parse("3/2").unwrap();
+        assert_eq!(first_difference_between_strings(b.ln(TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), 
+        "0.4054651081081643819780131154643491365719904234624941976140143241441006712489142512677524278173134012459685480453871800086824839".to_string()) >= TEST_ACCURACY_MIN, true);
+
+        // ln(5) = 1.6094379124341003...
+        let c = Fraction::parse("5").unwrap();
+        assert_eq!(first_difference_between_strings(c.ln(TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), 
+        "1.6094379124341003746007593332261876395256013542685177219126478914741789877076577646301338780931796107999663030217155628997240052".to_string()) >= TEST_ACCURACY_MIN, true);
+    }
+
+    #[test]
+    fn test_log() {
+        // -log10(1/2) = 0.3010299956639812...
+        let a = Fraction::parse("-1/2").unwrap();
+        assert_eq!(first_difference_between_strings(a.log(&Fraction::from(10),TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), 
+        "0.3010299956639811952137388947244930267681898814621085413104274611271081892744245094869272521181861720406844771914309953790947678".to_string()) >= TEST_ACCURACY_MIN, true);
+
+        // log2(3/2) = 0.5849625007211561...
+        let b = Fraction::parse("3/2").unwrap();
+        assert_eq!(first_difference_between_strings(b.log(&Fraction::from(2),TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), 
+        "0.5849625007211561814537389439478165087598144076924810604557526545410982277943585625222804749180882420909806624750591673437175524".to_string()) >= TEST_ACCURACY_MIN, true);
+
+        // log0.5(5) = -2.3219280948873623...
+        let c = Fraction::parse("5").unwrap();
+        assert_eq!(first_difference_between_strings(c.log(&Fraction::new(1,2),TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), 
+        "-2.3219280948873623478703194294893901758648313930245806120547563958159347766086252158501397433593701550996573717102502518268240".to_string()) >= TEST_ACCURACY_MIN, true);
+    }
+
+    #[test]
+    fn test_pow_frac() {
+        // (-1/2)^10 = 0.0009765625
+        let a = Fraction::parse("-1/2").unwrap();
+        assert_eq!(
+            (first_difference_between_strings(
+                a.pow_frac(&Fraction::from(10), TEST_PRECISION)
+                    .unwrap()
+                    .to_string_decimal(TEST_PRECISION),
+                "0.0009765625".to_string()
+            ) >= TEST_ACCURACY_MIN),
+            true
+        );
+
+        // (3/2)^2 = 2.25
+        let b = Fraction::parse("3/2").unwrap();
+        assert_eq!(
+            first_difference_between_strings(
+                b.pow_frac(&Fraction::from(2), TEST_PRECISION)
+                    .unwrap()
+                    .to_string_decimal(TEST_PRECISION),
+                "2.25".to_string()
+            ) >= TEST_ACCURACY_MIN,
+            true
+        );
+
+        // (5)^(1/2) = 2.2360679774997897...
+        let c = Fraction::parse("5").unwrap();
+        assert_eq!(first_difference_between_strings(c.pow_frac(&Fraction::new(1,2),TEST_PRECISION).unwrap().to_string_decimal(TEST_PRECISION), "2.2360679774997896964091736687312762354406183596115257242708972454105209256378048994144144083787822749695081761507737835042532677".to_string()) >= TEST_ACCURACY_MIN, true);
+    }
+
+    #[test]
+    fn test_pow() {
+        // (-1/2)^10 = 0.0009765625
+        let a = Fraction::parse("-1/2").unwrap();
+        assert_eq!(
+            (first_difference_between_strings(
+                a.pow(&Integer::from(10), TEST_PRECISION)
+                    .unwrap()
+                    .to_string_decimal(TEST_PRECISION),
+                "0.0009765625".to_string()
+            ) >= TEST_ACCURACY_MIN),
+            true
+        );
+
+        // (3/2)^2 = 2.25
+        let b = Fraction::parse("3/2").unwrap();
+        assert_eq!(
+            first_difference_between_strings(
+                b.pow(&Integer::from(2), TEST_PRECISION)
+                    .unwrap()
+                    .to_string_decimal(TEST_PRECISION),
+                "2.25".to_string()
+            ) >= TEST_ACCURACY_MIN,
+            true
+        );
+
+        // (5)^(-2) = 0.04
+        let c = Fraction::parse("5").unwrap();
+        assert_eq!(
+            first_difference_between_strings(
+                c.pow(&Integer::from(-2), TEST_PRECISION)
+                    .unwrap()
+                    .to_string_decimal(TEST_PRECISION),
+                "0.04".to_string()
+            ) >= TEST_ACCURACY_MIN,
+            true
+        );
+    }
+
+    #[test]
+    fn test_nth_root() {
+        // (-1/2)^(1/2) = -0.7071067811865475...
+        let a = Fraction::parse("-1/2").unwrap();
+        assert_eq!(
+            (first_difference_between_strings(
+                a.nth_root(&Fraction::from(2), TEST_PRECISION)
+                    .unwrap()
+                    .to_string_decimal(TEST_PRECISION),
+                "-0.7071067811865475244008443621048490392848359376884740365883398689953662392310535194251937671638207863675069231154561485124624".to_string()
+                    .to_string()
+            ) <= TEST_ACCURACY_MIN),
+            true
+        );
+
+        // (3/2)^(1/2) = 1.224744871391589...
+        let b = Fraction::parse("3/2").unwrap();
+        assert_eq!(
+            first_difference_between_strings(
+                b.nth_root(&Fraction::from(2), TEST_PRECISION)
+                    .unwrap()
+                    .to_string_decimal(TEST_PRECISION),
+                "1.2247448713915890490986420373529456959829737403283350642163462836254801887286575132699297165523201174092973006133070945624294327".to_string()
+            ) >= TEST_ACCURACY_MIN,
+            true
+        );
+
+        // (5)^(3/5) = 2.626527804403767...
+        let c = Fraction::parse("5").unwrap();
+        assert_eq!(
+            first_difference_between_strings(
+                c.nth_root(&Fraction::new(5,3), TEST_PRECISION)
+                    .unwrap()
+                    .to_string_decimal(TEST_PRECISION),
+                "2.6265278044037672364551312664964795821156628028108985300344363303869270378546021066316150651750738427353574321046405931908800517".to_string()
+            ) >= TEST_ACCURACY_MIN,
+            true
+        );
+    }
 }
 
 // old code
