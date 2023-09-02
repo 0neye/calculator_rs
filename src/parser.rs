@@ -1,48 +1,37 @@
 // a module for parsing a string representation of a mathematical expression
 
+use std::rc::Rc;
+
 use crate::{tokenizer::Token, Fraction};
 
-#[derive(PartialEq, Eq, Debug)]
-pub enum Node<'a> {
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum Node {
     UniOp {
         op: String,
-        child: Box<Node<'a>>,
+        child: Rc<Node>,
     },
     BinOp {
         op: String,
-        left: Box<Node<'a>>,
-        right: Box<Node<'a>>,
+        left: Rc<Node>,
+        right: Rc<Node>,
     },
     Function {
         name: String,
-        args: Vec<Node<'a>>,
+        args: Vec<Node>,
     },
     Identifier(String),
-    Number(&'a Fraction),
+    Number(Box<Fraction>),
 }
 
-const FUNCTION_ARG_COUNT: &[(&str, usize)] = &[
-    ("sin", 1),
-    ("cos", 1),
-    ("tan", 1),
-    ("log", 2),
-    ("ln", 1),
-    ("exp", 1),
-    ("root", 2),
-    ("floor", 1),
-    ("ceil", 1),
-    ("round", 1),
-    ("abs", 1),
-];
 
 /// Parses an expression with the given binary operators
 /// Calls the given function pointer when done
-fn parse_generic_bin_op<'a>(
-    tokens: &'a Vec<Token>,
+fn parse_generic_bin_op(
+    tokens: & Vec<Token>,
     pos: usize,
     ops: &[&str],
-    next_func: fn(&'a Vec<Token>, usize) -> Result<(Node<'a>, usize), String>,
-) -> Result<(Node<'a>, usize), String> {
+    next_func: fn(& Vec<Token>, usize) -> Result<(Node, usize), String>,
+) -> Result<(Node, usize), String> {
     // pos is the current position in the token stream to start parsing from
     let mut new_pos = pos;
     // parse the first node in the binary operation
@@ -66,8 +55,8 @@ fn parse_generic_bin_op<'a>(
                     // create a new node representing the binary operation
                     node = Node::BinOp {
                         op: op.to_string(),
-                        left: Box::new(node),
-                        right: Box::new(node2),
+                        left: Rc::new(node),
+                        right: Rc::new(node2),
                     };
                 } else {
                     break;
@@ -81,41 +70,41 @@ fn parse_generic_bin_op<'a>(
     Ok((node, new_pos))
 }
 
-fn parse_assignment<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
+fn parse_assignment(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String> {
     parse_generic_bin_op(tokens, pos, &["="], parse_add_sub)
 }
 
-fn parse_add_sub<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
+fn parse_add_sub(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String> {
     parse_generic_bin_op(tokens, pos, &["+", "-"], parse_mul_div)
 }
 
-fn parse_mul_div<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
+fn parse_mul_div(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String> {
     parse_generic_bin_op(tokens, pos, &["*", "/"], parse_pow)
 }
 
-fn parse_pow<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
+fn parse_pow(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String> {
     parse_generic_bin_op(tokens, pos, &["^"], parse_function)
 }
 
-fn parse_function<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
+fn parse_function(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String> {
     // if it's a function, parse the arguments
-    if let Token::FUNCTION(name) = &tokens[pos] {
+    if let Token::IDENTIFIER(name) = &tokens[pos] {
         let mut new_pos = pos + 1;
         let mut args = Vec::new();
-        // if it's a number and the function is log, parse the number as the argument
-        if name == "log" {
-            if let Token::NUMBER(num) = &tokens[new_pos] {
-                new_pos += 1;
-                args.push(Node::Number(num));
-            }
-        }
-        // or if it's the root function
-        else if name == "root" {
-            if let Token::NUMBER(num) = &tokens[new_pos] {
-                new_pos += 1;
-                args.push(Node::Number(num));
-            }
-        }
+        // // if it's a number and the function is log, parse the number as the argument
+        // if name == "log" {
+        //     if let Token::NUMBER(num) = &tokens[new_pos] {
+        //         new_pos += 1;
+        //         args.push(Node::Number(num));
+        //     }
+        // }
+        // // or if it's the root function
+        // else if name == "root" {
+        //     if let Token::NUMBER(num) = &tokens[new_pos] {
+        //         new_pos += 1;
+        //         args.push(Node::Number(num));
+        //     }
+        // }
         // if it's parentheses, parse the arguments inside
         if Token::DELIMITER("(".to_string()) == tokens[new_pos] {
             new_pos += 1;
@@ -136,18 +125,6 @@ fn parse_function<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, u
                 }
                 if Token::DELIMITER(")".to_string()) == tokens[new_pos] {
                     new_pos += 1;
-                    // if the number of arguments is not correct, return an error
-                    let arg_num = FUNCTION_ARG_COUNT
-                        .iter()
-                        .find(|(n, _)| *n == name)
-                        .unwrap()
-                        .1;
-                    if args.len() != arg_num {
-                        return Err(format!(
-                            "Expected {} arguments for function {}",
-                            arg_num, name
-                        ));
-                    }
                     // return the function node and the position in the token stream after parsing
                     return Ok((
                         Node::Function {
@@ -167,7 +144,7 @@ fn parse_function<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, u
     parse_atom(tokens, pos)
 }
 
-fn parse_atom<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
+fn parse_atom(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String> {
     let mut new_pos = pos;
     // if it's parentheses, parse the expression inside
     if Token::DELIMITER("(".to_string()) == tokens[pos] {
@@ -181,10 +158,7 @@ fn parse_atom<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize
                 if Token::OPERATOR("!".to_string()) == tokens[new_pos] {
                     new_pos += 1;
                     return Ok((
-                        Node::UniOp {
-                            op: "!".to_string(),
-                            child: Box::new(node),
-                        },
+                        factorial_node(node)?,
                         new_pos,
                     ));
                 }
@@ -196,17 +170,14 @@ fn parse_atom<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize
             return node_res; // return the error
         }
     }
-    // if it's an identifier, return an Identifier node
+    // if it's a variable, return an Identifier node
     else if let Token::IDENTIFIER(id) = &tokens[pos] {
         new_pos += 1;
         // if there's a factorial, return a UniOp node
         if Token::OPERATOR("!".to_string()) == tokens[new_pos] {
             new_pos += 1;
             return Ok((
-                Node::UniOp {
-                    op: "!".to_string(),
-                    child: Box::new(Node::Identifier(id.to_string())),
-                },
+                factorial_node(Node::Identifier(id.to_string()))?,
                 new_pos,
             ));
         }
@@ -219,14 +190,11 @@ fn parse_atom<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize
         if Token::OPERATOR("!".to_string()) == tokens[new_pos] {
             new_pos += 1;
             return Ok((
-                Node::UniOp {
-                    op: "!".to_string(),
-                    child: Box::new(Node::Number(n)),
-                },
+                factorial_node(Node::Number(Box::new(n.clone())))?,
                 new_pos,
             ));
         }
-        return Ok((Node::Number(n), new_pos));
+        return Ok((Node::Number(Box::new(n.clone())), new_pos));
     }
     // if it's a negative number, return a UniOp node
     else if Token::OPERATOR("-".to_string()) == tokens[pos] {
@@ -238,7 +206,7 @@ fn parse_atom<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize
                 return Ok((
                     Node::UniOp {
                         op: "-".to_string(),
-                        child: Box::new(node),
+                        child: Rc::new(node),
                     },
                     new_pos,
                 ));
@@ -249,8 +217,16 @@ fn parse_atom<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize
     Err("Expected number or opening parenthesis".to_string())
 }
 
+/// small helper func
+fn factorial_node(node: Node) -> Result<Node, String> {
+    Ok(Node::UniOp {
+        op: "!".to_string(),
+        child: Rc::new(node),
+    })
+}
+
 /// Basically just gives parse_assignment a more understandable name
-fn parse_expression<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>, usize), String> {
+fn parse_expression(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String> {
     parse_assignment(tokens, pos)
 }
 
@@ -260,9 +236,9 @@ fn parse_expression<'a>(tokens: &'a Vec<Token>, pos: usize) -> Result<(Node<'a>,
 /// -> parse_assignment -> parse_add_sub
 /// -> parse_mul_div -> parse_pow
 /// -> parse_function -> parse_atom
-pub fn parse<'a>(tokens: &'a Vec<Token>) -> Result<Node<'a>, String> {
+pub fn parse(tokens: & Vec<Token>) -> Result<Node, String> {
     let pos = 0;
-    match parse_assignment(&tokens, pos) {
+    match parse_expression(&tokens, pos) {
         Ok((node, next_pos)) => {
             if next_pos == tokens.len() - 1 {
                 return Ok(node);

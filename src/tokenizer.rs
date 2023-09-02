@@ -7,15 +7,15 @@ use crate::Fraction;
 
 const OPERATORS: [&str; 8] = ["+", "-", "*", "/", "%", "^", "!", "="];
 const DELIMITERS: [&str; 3] = ["(", ")", ","];
-const FUNCTIONS: [&str; 11] = [
-    "sin", "cos", "tan", "log", "ln", "exp", "root", "floor", "ceil", "round", "abs",
-];
+// const FUNCTIONS: [&str; 11] = [
+//     "sin", "cos", "tan", "log", "ln", "exp", "root", "floor", "ceil", "round", "abs",
+// ];
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Token {
     OPERATOR(String),
     DELIMITER(String),
-    FUNCTION(String),
+    //FUNCTION(String),
     IDENTIFIER(String),
     NUMBER(Fraction),
     EOE, // end of expression
@@ -29,9 +29,9 @@ fn is_delimiter(c: &char) -> bool {
     DELIMITERS.contains(&c.to_string().as_str())
 }
 
-fn is_function(c: &str) -> bool {
-    FUNCTIONS.contains(&c)
-}
+// fn is_function(c: &str) -> bool {
+//     FUNCTIONS.contains(&c)
+// }
 
 /// Returns a list of tokens representing individual components of a math expression
 pub fn get_tokens(input: &str) -> Result<Vec<Token>, String> {
@@ -58,18 +58,18 @@ pub fn get_tokens(input: &str) -> Result<Vec<Token>, String> {
         } else if c.is_alphabetic() || c == '_' {
             let mut current_token = c.to_string();
             while let Some(&c) = chars.peek() {
-                if c.is_alphabetic() || c == '_' {
+                if c.is_alphabetic() || c.is_numeric() || c == '_' {
                     current_token.push(c);
                     chars.next();
                 } else {
                     break;
                 }
             }
-            if is_function(current_token.as_str()) {
-                tokens.push(Token::FUNCTION(current_token));
-            } else {
+            // if is_function(current_token.as_str()) {
+            //     tokens.push(Token::FUNCTION(current_token));
+            // } else {
                 tokens.push(Token::IDENTIFIER(current_token));
-            }
+            //}
         } else if c.is_whitespace() {
             continue;
         } else {
