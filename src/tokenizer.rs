@@ -78,34 +78,36 @@ pub fn get_tokens(input: &str) -> Result<Vec<Token>, String> {
     }
     tokens.push(Token::EOE);
 
-    // The following doesn't work.
-    // It's a bit more complicated to add implicit multiplication because of being able to call functions like "log2(params)" (the '2' is the issue)
+    // add implicit multiplication tokens
+    let mut new_tokens: Vec<Token> = Vec::new();
 
-    // go through and add implicit multiplication tokens between numbers and parentheses, parentheses and numbers, and parentheses and parentheses
-    // let mut new_tokens: Vec<Token> = Vec::new();
-    // for i in 0..tokens.len() {
-    //     if i > 0 {
-    //         if let Token::NUMBER(_) = tokens[i - 1] {
-    //             if let Token::DELIMITER(ref d) = tokens[i] {
-    //                 if d == "(" {
-    //                     new_tokens.push(Token::OPERATOR("*".to_string()));
-    //                 }
-    //             }
-    //         } else if let Token::DELIMITER(ref d) = tokens[i - 1] {
-    //             if d == ")" {
-    //                 if let Token::NUMBER(_) = tokens[i] {
-    //                     new_tokens.push(Token::OPERATOR("*".to_string()));
-    //                 } else if let Token::DELIMITER(ref d) = tokens[i] {
-    //                     if d == "(" {
-    //                         new_tokens.push(Token::OPERATOR("*".to_string()));
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     tokens.push(tokens[i].clone());
-    // }
+    for i in 0..tokens.len() {
+        if i > 0 {
+            if let Token::NUMBER(_) = tokens[i - 1] {
+                if let Token::DELIMITER(ref d) = tokens[i] {
+                    if d == "(" {
+                        new_tokens.push(Token::OPERATOR("*".to_string()));
+                    }
+                } else if let Token::IDENTIFIER(_) = &tokens[i] {
+                    new_tokens.push(Token::OPERATOR("*".to_string()));
+                }
+            } else if let Token::DELIMITER(ref d) = tokens[i - 1] {
+                if d == ")" {
+                    if let Token::NUMBER(_) = tokens[i] {
+                        new_tokens.push(Token::OPERATOR("*".to_string()));
+                    } else if let Token::DELIMITER(ref d) = tokens[i] {
+                        if d == "(" {
+                            new_tokens.push(Token::OPERATOR("*".to_string()));
+                        }
+                    } else if let Token::IDENTIFIER(_) = &tokens[i] {
+                        new_tokens.push(Token::OPERATOR("*".to_string()));
+                    }
+                }
+            }
+        }
+        new_tokens.push(tokens[i].clone());
+    }
 
-    // Ok(new_tokens)
-    Ok(tokens)
+    Ok(new_tokens)
+    //Ok(tokens)
 }

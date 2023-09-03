@@ -8,7 +8,7 @@ use fieri::{
     completion::{create, CompletionParamBuilder},
     Client, Error,
 };
-use std::{env, io::BufRead};
+use std::{env, io::{BufRead, Write}};
 
 //use std::fs::File;
 use crate::calc_engine::Fraction;
@@ -142,12 +142,15 @@ fn help_menu() {
             help                    Display this help menu
 
         Examples:
-            'log2.1(pi) + 2^3' or 'log(2.1, pi) + 2^3'
-            'frac = 1/2 + 1/3'
-            'root(2, 3)' or 'root2(3)'
+            'log(2.1, pi) + 2^3'
+            'x = 1/2 + 1/3'
+            'root(2, 3)'
             'e^pi' or 'exp(pi)'
             'sin(pi/2)'
-            'test = last + 1/2'"
+            'test = last + 1/2'
+            'f(x) = x^2 + 2x - 5'
+            'f(45)'
+            "
     );
 }
 
@@ -277,7 +280,8 @@ async fn main() {
         loop {
             // get input
             let mut input = String::new();
-            println!("Enter an expression (q to quit):");
+            print!("Calc >> ");
+            io::stdout().flush().unwrap();
             io::stdin().read_line(&mut input).unwrap();
             if input.trim() == "q" {
                 break;
@@ -329,7 +333,7 @@ async fn main() {
             );
             if let Ok(result) = result {
                 println!(
-                    "\nAnswer: {}\n",
+                    "\n> {}\n",
                     get_fmt_function(&display_fmt)(&result, fmt_precision)
                 );
                 previous_ans = result;
