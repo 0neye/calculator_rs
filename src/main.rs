@@ -4,6 +4,7 @@ pub mod parser;
 pub mod tokenizer;
 
 use evaluator::SymbolTable;
+use evaluator::EvalResult;
 use fieri::{
     completion::{create, CompletionParamBuilder},
     Client, Error,
@@ -11,16 +12,17 @@ use fieri::{
 use std::{env, io::{BufRead, Write}};
 
 //use std::fs::File;
-use crate::calc_engine::Fraction;
+use calc_engine::Fraction;
+use calc_engine::Matrix;
 use std::io;
 
 /// Evaluates an expresion and returns the result of the calculation
 fn evaluate_expr(
     input: String,
     precision: u32,
-    previous_ans: Option<&Fraction>,
-    symbol_table: &mut SymbolTable,
-) -> Result<Fraction, String> {
+    previous_ans: Option<&EvalResult>,
+    symbol_table: &mut SymbolTable
+) -> Result<EvalResult, String> {
     let token_res = tokenizer::get_tokens(&input);
     if let Ok(tokens) = token_res {
         //dbg!(&tokens);
@@ -29,7 +31,10 @@ fn evaluate_expr(
             //dbg!(&parsed);
             let evaluated = evaluator::evaluate(&parsed, precision, previous_ans, symbol_table);
             if let Ok(evaluated) = evaluated {
-                Ok(evaluated.rounded_if_close())
+                Ok(match evaluated {
+                    EvalResult::Fraction(f) => f.rounded_if_close().into(),
+                    EvalResult::Matrix(m) => m.into(),
+                })
             } else {
                 Err(format!("invalid input: {}", evaluated.unwrap_err()))
             }
@@ -38,6 +43,16 @@ fn evaluate_expr(
         }
     } else {
         Err(format!("invalid input: {}", token_res.unwrap_err()))
+    }
+}
+
+fn get_fmt_function(fmt: &str) -> fn(&Fraction, u32) -> String {
+    match fmt {
+        "decimal" | "d" => Fraction::to_string_decimal,
+        "fraction" | "f" => Fraction::to_string_p,
+        "mixed" | "m" => Fraction::to_string_mixed,
+        "scientific" | "s" => Fraction::to_string_scientific,
+        _ => panic!("Invalid format option: {}", fmt),
     }
 }
 
@@ -253,15 +268,6 @@ fn evaluate_arguments(args: Vec<String>) -> Result<(String, Option<Vec<CliArgume
     }
 }
 
-fn get_fmt_function(fmt: &str) -> fn(&Fraction, u32) -> String {
-    match fmt {
-        "decimal" | "d" => Fraction::to_string_decimal,
-        "fraction" | "f" => Fraction::to_string_p,
-        "mixed" | "m" => Fraction::to_string_mixed,
-        "scientific" | "s" => Fraction::to_string_scientific,
-        _ => panic!("Invalid format option: {}", fmt),
-    }
-}
 
 //main
 #[tokio::main]
@@ -276,7 +282,7 @@ async fn main() {
     let args: Vec<String> = env::args().collect();
     // if there are no arguments, start the REPL
     if args.len() == 1 {
-        let mut previous_ans: Fraction = Fraction::from(0);
+        let mut previous_ans: EvalResult = Fraction::zero().into();
         loop {
             // get input
             let mut input = String::new();
@@ -332,11 +338,12 @@ async fn main() {
                 &mut symbol_table,
             );
             if let Ok(result) = result {
-                println!(
-                    "\n> {}\n",
-                    get_fmt_function(&display_fmt)(&result, fmt_precision)
-                );
                 previous_ans = result;
+                let str = match previous_ans.clone() {
+                    EvalResult::Fraction(f) => get_fmt_function(&display_fmt)(&f, fmt_precision),
+                    EvalResult::Matrix(m) => m.to_string(),
+                };
+                println!("\n> {}\n", str);
             } else {
                 println!("{}", result.unwrap_err());
             }
@@ -381,7 +388,11 @@ async fn main() {
 
         let result = evaluate_expr(input, calc_precision, None, &mut symbol_table);
         if let Ok(result) = result {
-            println!("{}", get_fmt_function(&display_fmt)(&result, fmt_precision));
+            let str = match result {
+                EvalResult::Fraction(f) => get_fmt_function(&display_fmt)(&f, fmt_precision),
+                EvalResult::Matrix(m) => m.to_string(),
+            };
+            println!("\n> {}\n", str);
         } else {
             println!("{}", result.unwrap_err());
         }
