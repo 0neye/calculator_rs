@@ -112,6 +112,17 @@ fn parse_function(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), Str
                 }
                 if Token::DELIMITER(")".to_string()) == tokens[new_pos] {
                     new_pos += 1;
+                    // if there's a factorial, return a UniOp node
+                    if Token::OPERATOR("!".to_string()) == tokens[new_pos] {
+                        new_pos += 1;
+                        return Ok((
+                            factorial_node(Node::Function {
+                                name: name.to_string(),
+                                args,
+                            })?,
+                            new_pos,
+                        ))
+                    }
                     // return the function node and the position in the token stream after parsing
                     return Ok((
                         Node::Function {
@@ -179,6 +190,14 @@ fn parse_atom(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String>
                     if !row.is_empty() {
                         matrix.push(row);
                     }
+                    // if there's a factorial, return a UniOp node
+                    if Token::OPERATOR("!".to_string()) == tokens[new_pos] {
+                        new_pos += 1;
+                        return Ok((
+                            factorial_node(Node::Matrix(matrix))?,
+                            new_pos,
+                        ))
+                    }
                     break;
                 } else {
                     return Err("Expected ',' or ';' or ']' for matrix".to_string());
@@ -215,10 +234,10 @@ fn parse_atom(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String>
         }
         return Ok((Node::Number(Box::new(n.clone())), new_pos));
     }
-    // if it's a negative number, return a UniOp node
+    // if it's a negative, return a UniOp node
     else if Token::OPERATOR("-".to_string()) == tokens[pos] {
         new_pos += 1;
-        let node_res = parse_atom(tokens, new_pos);
+        let node_res = parse_expression(tokens, new_pos);
         match node_res {
             Ok((node, next_pos)) => {
                 new_pos = next_pos;
