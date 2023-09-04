@@ -6,7 +6,7 @@ use std::str::{Chars, FromStr};
 use crate::Fraction;
 
 const OPERATORS: [&str; 8] = ["+", "-", "*", "/", "%", "^", "!", "="];
-const DELIMITERS: [&str; 3] = ["(", ")", ","];
+const DELIMITERS: [&str; 6] = ["(", ")", ",", ";", "[", "]"];
 // const FUNCTIONS: [&str; 11] = [
 //     "sin", "cos", "tan", "log", "ln", "exp", "root", "floor", "ceil", "round", "abs",
 // ];
@@ -92,11 +92,11 @@ pub fn get_tokens(input: &str) -> Result<Vec<Token>, String> {
                     new_tokens.push(Token::OPERATOR("*".to_string()));
                 }
             } else if let Token::DELIMITER(ref d) = tokens[i - 1] {
-                if d == ")" {
+                if d == ")" || d == "]" {
                     if let Token::NUMBER(_) = tokens[i] {
                         new_tokens.push(Token::OPERATOR("*".to_string()));
                     } else if let Token::DELIMITER(ref d) = tokens[i] {
-                        if d == "(" {
+                        if d == "(" || d == "[" {
                             new_tokens.push(Token::OPERATOR("*".to_string()));
                         }
                     } else if let Token::IDENTIFIER(_) = &tokens[i] {

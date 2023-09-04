@@ -21,6 +21,7 @@ pub enum Node {
     },
     Identifier(String),
     Number(Box<Fraction>),
+    Matrix(Vec<Vec<Node>>),
 }
 
 
@@ -91,20 +92,6 @@ fn parse_function(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), Str
     if let Token::IDENTIFIER(name) = &tokens[pos] {
         let mut new_pos = pos + 1;
         let mut args = Vec::new();
-        // // if it's a number and the function is log, parse the number as the argument
-        // if name == "log" {
-        //     if let Token::NUMBER(num) = &tokens[new_pos] {
-        //         new_pos += 1;
-        //         args.push(Node::Number(num));
-        //     }
-        // }
-        // // or if it's the root function
-        // else if name == "root" {
-        //     if let Token::NUMBER(num) = &tokens[new_pos] {
-        //         new_pos += 1;
-        //         args.push(Node::Number(num));
-        //     }
-        // }
         // if it's parentheses, parse the arguments inside
         if Token::DELIMITER("(".to_string()) == tokens[new_pos] {
             new_pos += 1;
@@ -169,6 +156,38 @@ fn parse_atom(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String>
         } else {
             return node_res; // return the error
         }
+    }
+    // if it's square brackets, parse the matrix inside
+    else if Token::DELIMITER("[".to_string()) == tokens[pos] {
+        // matrix format is [1,2,3;4,5,6;7,8,9]
+        new_pos += 1;
+        let mut matrix = Vec::new();
+        let mut row = Vec::new();
+        loop {
+            let node_res = parse_expression(tokens, new_pos);
+            if let Ok((node, next_pos)) = node_res {
+                new_pos = next_pos;
+                row.push(node);
+                if Token::DELIMITER(",".to_string()) == tokens[new_pos] {
+                    new_pos += 1;
+                } else if Token::DELIMITER(";".to_string()) == tokens[new_pos] {
+                    new_pos += 1;
+                    matrix.push(row);
+                    row = Vec::new();
+                } else if Token::DELIMITER("]".to_string()) == tokens[new_pos] {
+                    new_pos += 1;
+                    if !row.is_empty() {
+                        matrix.push(row);
+                    }
+                    break;
+                } else {
+                    return Err("Expected ',' or ';' or ']' for matrix".to_string());
+                }
+            } else {
+                return node_res; // return the error
+            }
+        }
+        return Ok((Node::Matrix(matrix), new_pos));
     }
     // if it's a variable, return an Identifier node
     else if let Token::IDENTIFIER(id) = &tokens[pos] {

@@ -102,6 +102,12 @@ impl Fraction {
         }
     }
 
+    pub fn zero() -> Fraction {
+        Fraction {
+            value: Rational::from(0),
+        }
+    }
+
     // add
     pub fn added_to(&self, other: &Fraction) -> Fraction {
         Fraction {
@@ -173,7 +179,7 @@ impl Fraction {
     /// Gets the integer part of a Fraction
     pub fn trunc(&self) -> Fraction {
         Fraction {
-            value: if self > &Fraction::from(0) {
+            value: if self > &Fraction::zero() {
                 (&self.value).floor().into()
             } else {
                 (&self.value).ceiling().into()
@@ -263,7 +269,7 @@ impl Fraction {
         let scaled = self.fract();
 
         // when the value is exactly a whole number
-        if scaled == Fraction::from(0) {
+        if scaled == Fraction::zero() {
             return Ok(exp_int_part.trimed(precision));
         }
         // when it has a fractional part as well
@@ -322,7 +328,7 @@ impl Fraction {
         // if it's 1
         else if self.value == 1.0 {
             //return 0
-            return Ok(Fraction::from(0));
+            return Ok(Fraction::zero());
         }
         // if it's negative, recurse
         else if self.value < 0.0 {
@@ -359,7 +365,7 @@ impl Fraction {
         .trimed(precision);
 
         // initialize the sum to 0
-        let mut sum = Fraction::from(0);
+        let mut sum = Fraction::zero();
 
         // iterate until the last term is small enough
         for i in 0..MAX_LOOP_TIMES {
@@ -708,7 +714,7 @@ impl Fraction {
         }
         if self.value == 0.0 {
             //return 0
-            return Ok(Fraction::from(0));
+            return Ok(Fraction::zero());
         }
         if exponent.value < 0.0 {
             //return 1 / x ^ -n
@@ -844,7 +850,7 @@ impl Fraction {
     /// Returns a string representation of the fraction in mixed number form.
     pub fn to_string_mixed(&self, precision: u32) -> String {
         let mut res = String::new();
-        if self < &Fraction::from(0) {
+        if self < &Fraction::zero() {
             res += "-";
         }
         res += &self.trunc().numer().to_string();
@@ -1038,6 +1044,358 @@ impl std::fmt::Display for Fraction {
         write!(f, "{}", self.value)
     }
 }
+//Sum
+impl std::iter::Sum for Fraction {
+    fn sum<I: Iterator<Item=Fraction>>(iter: I) -> Self {
+        iter.fold(Fraction::zero(), std::ops::Add::add)
+    }
+}
+
+
+
+
+// ==============================================================
+// Matrices
+// ==============================================================
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Matrix {
+    rows: usize,
+    cols: usize,
+    data: Vec<Fraction>, 
+}
+
+impl Matrix {
+
+    pub fn new(rows: usize, cols: usize) -> Matrix {
+        Matrix {
+            rows,
+            cols,
+            data: Vec::with_capacity(rows * cols),
+        }
+    }
+
+    pub fn new_from_data(rows: usize, cols: usize, data: Vec<Fraction>) -> Result<Matrix, String> {
+        if data.len() != rows * cols {
+            return Err("Data size does not match matrix dimensions".to_string());
+        }
+
+        Ok(Matrix {
+            rows,
+            cols,
+            data,
+        })
+    }
+    
+    // Create a new Matrix from a string
+    pub fn new_from_str(s: &str) -> Result<Matrix, String> {
+        let mut rows = Vec::new();
+        let mut current_row = Vec::new();
+        
+        for c in s.chars() {
+            if c == ';' {
+                rows.push(current_row);
+                current_row = Vec::new();
+            } else if c == ',' {
+                current_row.push(Fraction::zero()); 
+            } else {
+                let v = c.to_string().parse::<Fraction>().map_err(|_| "Invalid number")?;
+                current_row.push(v);
+            }
+        }
+        
+        rows.push(current_row); // add final row
+        
+        Self::new_from_rows(rows)
+    }
+
+    pub fn new_from_rows(rows: Vec<Vec<Fraction>>) -> Result<Matrix, String> {
+        let num_cols = rows[0].len();
+        let num_rows = rows.len();
+        for row in &rows {
+            if row.len() != num_cols {
+                return Err("Rows must have equal length".to_string());
+            }
+        }
+        
+        let mut data = Vec::new();
+        for row in rows {
+            data.extend(row.into_iter());
+        }
+        
+        Ok(Matrix{ 
+            rows: num_rows,
+            cols: num_cols,
+            data 
+        })
+    }
+
+    pub fn rows(&self) -> usize {
+        self.rows
+    }
+
+    pub fn cols(&self) -> usize {
+        self.cols
+    }
+
+    pub fn size(&self) -> usize {
+        self.rows * self.cols
+    }
+
+    // Add two matrices 
+    pub fn add(&self, other: &Matrix) -> Result<Matrix, String> {
+        if self.rows != other.rows || self.cols != other.cols {
+            return Err("Matrices must have equal dimensions".to_string());
+        }
+        
+        let mut data = Vec::with_capacity(self.data.len());
+        for i in 0..self.data.len() {
+            data.push(self.data[i].added_to(&other.data[i])); 
+        }
+        
+        Ok(Matrix {
+            rows: self.rows,
+            cols: self.cols,
+            data 
+        })
+    }
+
+    // Subtract two matrices
+    pub fn subtract(&self, other: &Matrix) -> Result<Matrix, String> {
+        if self.rows != other.rows || self.cols != other.cols {
+            return Err("Matrices must have equal dimensions".to_string());
+        }
+        
+        let mut data = Vec::with_capacity(self.data.len());
+        for i in 0..self.data.len() {
+            data.push(self.data[i].subtract(&other.data[i])); 
+        }
+        
+        Ok(Matrix {
+            rows: self.rows,
+            cols: self.cols,
+            data 
+        })
+    }
+    
+    // Multiply two matrices 
+    pub fn multiply(&self, other: &Matrix) -> Result<Matrix, String> {
+        if self.cols != other.rows {
+            return Err("Can not multiply matrices with incompatible dimensions".to_string());
+        }
+        
+        let mut result = Matrix::zeros(self.rows, other.cols);
+        
+        for i in 0..self.rows {
+            for j in 0..other.cols {
+                result.data[i*other.cols + j] = self.multiply_row_column(i, j, other);
+            }
+        }
+        
+        Ok(result)
+    }
+    fn multiply_row_column(&self, row: usize, col: usize, other: &Matrix) -> Fraction {
+        (0..self.cols).map(|k| self.data[row*self.cols + k].multiply(&other.data[k*other.cols + col]))
+        .sum()
+    }
+
+    // Multiply matrix by a scalar
+    pub fn scale(&self, k: &Fraction) -> Matrix {
+        let mut data = self.data.clone();
+        for v in &mut data {
+            v.mul_assign(k);
+        }
+        
+        Matrix {
+            rows: self.rows,
+            cols: self.cols,
+            data
+        }
+    }
+
+    // Apply a function to each element
+    pub fn apply(&self, f: &dyn Fn(Fraction) -> Fraction) -> Matrix {
+        let mut data = self.data.clone();
+        for v in &mut data {
+            *v = f(v.clone());
+        }
+        
+        Matrix {
+            rows: self.rows,
+            cols: self.cols,
+            data
+        }
+    }
+    pub fn try_apply(&self, f: &dyn Fn(Fraction) -> Result<Fraction, String>) -> Result<Matrix, String> {
+        let mut data = self.data.clone();
+        for v in &mut data {
+            *v = f(v.clone())?;
+        }
+        
+        Ok(Matrix {
+            rows: self.rows,
+            cols: self.cols,
+            data
+        })
+    }
+
+    // Compute inverse using adjugate matrix divided by determinant
+    pub fn inverse(&self) -> Result<Matrix, String> {
+        let det = self.determinant()?;
+        if det == Fraction::zero() {
+            return Err("Matrix is not invertible".to_string());
+        }
+        
+        let mut adjugate = Matrix::zeros(self.rows, self.cols);
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                adjugate.data[j*self.cols + i] = self.cofactor(i, j)?; 
+            }
+        }
+        
+        Ok(adjugate.scale(&(Fraction::from(1) / det)))
+    }
+
+    // Compute cofactor recursively 
+    fn cofactor(&self, row: usize, col: usize) -> Result<Fraction, String> {
+
+        if self.rows != self.cols {
+            return Err("Matrix must be square".to_string());
+        }
+
+        let sign: Fraction = if (row + col) % 2 == 0 { 
+            1.into() 
+        } else { 
+            (-1).into() 
+        };
+
+        let minor = self.minor(row, col)?;
+        Ok(sign * minor)
+    }
+
+    fn minor(&self, row: usize, col: usize) -> Result<Fraction, String> {
+
+        if self.rows == 1 {
+            return Ok(Fraction::from(1));
+        }
+
+        let mut submatrix = Vec::new();
+
+        for i in 0..self.rows {
+            if i != row {
+                let mut subrow = Vec::new();
+                for j in 0..self.cols {
+                    if j != col {
+                        subrow.push(self.data[i * self.cols + j].clone()); 
+                    }
+                }
+                submatrix.push(subrow);
+            }
+        }
+
+        let submatrix = Matrix::new_from_rows(submatrix)?; 
+        submatrix.determinant()
+    }
+
+    // Compute determinant recursively
+    fn determinant(&self) -> Result<Fraction, String> {
+        
+        if self.rows == 1 {
+            return Ok(self.data[0].clone());
+        }
+
+        let mut det = Fraction::zero();
+        for i in 0..self.cols {
+            let cofactor = self.cofactor(0, i)?;
+            det.add_assign(&(&cofactor.multiply(&self.data[i])));
+        }
+
+        Ok(det)
+    }
+
+    fn zeros(rows: usize, cols: usize) -> Matrix {
+        Matrix {
+            rows,
+            cols,
+            data: vec![Fraction::zero(); rows*cols],
+        }
+    }
+
+}
+
+impl IntoIterator for Matrix {
+    type Item = Fraction;
+    type IntoIter = std::vec::IntoIter<Fraction>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
+    }
+}
+impl std::ops::Index<[usize; 2]> for Matrix {
+    type Output = Fraction;
+    
+    fn index(&self, index: [usize; 2]) -> &Self::Output {
+        let row = index[0];
+        let col = index[1];
+        &self.data[row * self.cols + col]
+    }
+}
+use std::fmt;
+
+impl fmt::Display for Matrix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        //println!("Matrix: {:?}", self);
+        if self.rows() > 1 && self.cols() > 0 {
+            write!(f, "\n")?;
+        }
+
+        let max_width = self.data.iter()
+            .map(|fraction| fraction.to_string_scientific(3).len())
+            .max()
+            .unwrap_or(0);
+
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                let fraction = &self.data[i * self.cols + j];
+                write!(f, "{:>width$}", fraction.to_string_scientific(3), width = max_width)?;
+                if j != self.cols - 1 {
+                    write!(f, " ")?;
+                }
+            }
+            if i != self.rows - 1 {
+                writeln!(f)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // tests
 #[cfg(test)]
@@ -1494,7 +1852,7 @@ mod tests {
 //     // if it's 1
 //     else if self.value == 1.0 {
 //         //return 0
-//         return Ok(Fraction::from(0));
+//         return Ok(Fraction::zero());
 //     }
 //     // if it's negative, recurse
 //     else if self.value < 0.0 {
@@ -1510,7 +1868,7 @@ mod tests {
 //             .multiply(&Fraction::ln2())
 //             .multiply(&Fraction::log2_10())
 //     } else {
-//         Fraction::from(0)
+//         Fraction::zero()
 //     };
 //     // scale frac between 1 and e^(1/2)
 //     let mut scale_small = 0;
