@@ -13,7 +13,7 @@ use std::{env, io::{BufRead, Write}};
 
 //use std::fs::File;
 use calc_engine::Fraction;
-use calc_engine::Matrix;
+//use calc_engine::Matrix;
 use std::io;
 
 /// Evaluates an expresion and returns the result of the calculation
@@ -29,7 +29,10 @@ fn evaluate_expr(
         let parsed = parser::parse(&tokens);
         if let Ok(parsed) = parsed {
             //dbg!(&parsed);
+            //let start_time = std::time::Instant::now();
             let evaluated = evaluator::evaluate(&parsed, precision, previous_ans, symbol_table);
+            //let end_time = std::time::Instant::now();
+            //println!("Time: {}ms", end_time.duration_since(start_time).as_millis());
             if let Ok(evaluated) = evaluated {
                 Ok(match evaluated {
                     EvalResult::Fraction(f) => f.rounded_if_close().into(),
@@ -146,14 +149,14 @@ fn help_menu() {
             assignment: '=' (variables can not have numbers)
 
         Options:
-            --f [format]            Set the display format for the answer
+            --f  [format]            Set the display format for the answer
                                     Options: decimal (d), fraction (f), mixed (m), scientific (s)
                                     Default: decimal
-            --p [precision]         Set the precision for the answer and all intermediate calculations
+            --p  [precision]         Set the precision for the answer and all intermediate calculations
                                     Default: 500
             --fp [format-precision] Set the precision for just the formatted answer
                                     Default: 35
-            --q [query]             Use OpenAI api to evaluate a query into an expression
+            --q  [query]             Use OpenAI api to evaluate a query into an expression
             help                    Display this help menu
 
         Examples:
@@ -341,7 +344,7 @@ async fn main() {
                 previous_ans = result;
                 let str = match previous_ans.clone() {
                     EvalResult::Fraction(f) => get_fmt_function(&display_fmt)(&f, fmt_precision),
-                    EvalResult::Matrix(m) => m.to_string(),
+                    EvalResult::Matrix(m) => m.to_string_fmt(get_fmt_function(&display_fmt), fmt_precision),
                 };
                 println!("\n> {}\n", str);
             } else {
@@ -390,7 +393,7 @@ async fn main() {
         if let Ok(result) = result {
             let str = match result {
                 EvalResult::Fraction(f) => get_fmt_function(&display_fmt)(&f, fmt_precision),
-                EvalResult::Matrix(m) => m.to_string(),
+                EvalResult::Matrix(m) => m.to_string_fmt(get_fmt_function(&display_fmt), fmt_precision),
             };
             println!("\n> {}\n", str);
         } else {

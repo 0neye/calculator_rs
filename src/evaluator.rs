@@ -3,6 +3,7 @@ use std::rc::Rc;
 use crate::{calc_engine::Fraction, calc_engine::Matrix, parser::Node};
 
 const FUNCTION_ARG_COUNT: &[(&str, usize)] = &[
+    // fractions
     ("sin", 1),
     ("cos", 1),
     ("tan", 1),
@@ -12,8 +13,18 @@ const FUNCTION_ARG_COUNT: &[(&str, usize)] = &[
     ("root", 2),
     ("floor", 1),
     ("ceil", 1),
-    ("round", 1),
+    ("round", 2),
     ("abs", 1),
+    // matrices
+    ("det", 1),
+    ("inv", 1),
+    ("ref", 1),
+];
+// TODO: rework how built-in functions are stored
+const MATRIX_FUNCTIONS: &[&str] = &[
+    "det",
+    "inv",
+    "ref",
 ];
 
 #[derive(Clone)]
@@ -115,7 +126,7 @@ impl From<EvalResult> for Fraction {
     fn from(result: EvalResult) -> Self {
         match result {
             EvalResult::Fraction(fraction) => fraction,
-            EvalResult::Matrix(matrix) => panic!("Can not convert matrix to fraction"),
+            EvalResult::Matrix(_) => panic!("Can not convert matrix to fraction"),
         }
     }
 }
@@ -260,7 +271,7 @@ pub fn evaluate(
         Node::Function { name, args } => {
             // check for the correct number of arguments
             if FUNCTION_ARG_COUNT.iter()
-                .any(|(func_name, count)| func_name == &name && args.len() != *count) {
+                .any(|(func_name, count)| func_name == &name && args.len() > *count) {
                 return Err(format!("Wrong number of arguments for function: {}", name));
             }
 
@@ -283,22 +294,25 @@ pub fn evaluate(
                 }
             };
 
-            let handle_frac = |args: Vec<Fraction>| -> Result<Fraction, String> {
-                match name.as_str() {
-                    "sin" => args[0].sin(precision),
-                    "cos" => args[0].cos(precision),
-                    "tan" => args[0].tan(precision),
-                    "log" => args[1].log(&args[0], precision),
-                    "ln" => args[0].ln(precision),
-                    "exp" => args[0].exp(precision),
-                    "root" => args[1].nth_root(&args[0], precision),
-                    "floor" => Ok(args[0].floor()),
-                    "ceil" => Ok(args[0].ceil()),
-                    "round" => Ok(args[0].round()),
-                    "abs" => Ok(args[0].abs()),
+            let handle_frac_args = |args: Vec<Fraction>| -> Result<EvalResult, String> {
+                Ok(match name.as_str() {
+                    "sin" => args[0].sin(precision)?.into(),
+                    "cos" => args[0].cos(precision)?.into(),
+                    "tan" => args[0].tan(precision)?.into(),
+                    "log" if args.len() == 1 => args[0].log(&10u32.into(), precision)?.into(),
+                    "log" if args.len() == 2 => args[1].log(&args[0], precision)?.into(),
+                    "ln" => args[0].ln(precision)?.into(),
+                    "exp" => args[0].exp(precision)?.into(),
+                    "root" if args.len() == 1 => args[0].nth_root(&2u32.into(), precision)?.into(),
+                    "root" if args.len() == 2 => args[1].nth_root(&args[0], precision)?.into(),
+                    "floor" => args[0].floor().into(),
+                    "ceil" => args[0].ceil().into(),
+                    "round" if args.len() == 1 => args[0].round().into(),
+                    "round" if args.len() == 2 => args[0].round_to_decimal(&args[1])?.into(),
+                    "abs" => args[0].abs().into(),
                     // user's custom functions
-                    func_name => Ok(handle_custom_func(func_name, args.iter().map(|f| EvalResult::from(f.clone())).collect())?.into()),
-                }
+                    func_name => handle_custom_func(func_name, args.iter().map(|f| EvalResult::from(f.clone())).collect())?,
+                })
             };
             
             // TODO: switch destructuring feature to call-side so it can work with any function
@@ -314,23 +328,29 @@ pub fn evaluate(
             // }
             for arg in &evaled_args {
                 if let EvalResult::Matrix(m) = arg {
-                    // rule out built-in functions if a matrix was passed in
                     if FUNCTION_ARG_COUNT.iter().any(|(func_name, _)| func_name == &name) {
-                        return Err(format!("Matrix passed to function '{}' that is not destructive.", name));
-                    } else {
-                        if let Some((arg_names, body, destruct)) = symbol_table.get_function(name) {
-                            // evaluate the function for every element of the matrix
-                            if destruct && evaled_args.len() == 1 {
-                                // store the arguments in a temporary symbol table
-                                let mut temp_symbol_table = symbol_table.clone();
-                                temp_symbol_table.remove_symbol(name); // prevent recursive calls
-                                let mut res_matrix: Vec<Fraction> = Vec::new();
-                                for f in m.clone() {
-                                    temp_symbol_table.set_variable(arg_names[0].clone(), Box::new(f.into()));
-                                    res_matrix.push(evaluate(&body, precision, previous_ans, &mut temp_symbol_table)?.into());
-                                }
-                                return Ok(Matrix::new_from_data(m.rows(), m.cols(), res_matrix)?.into());
+                        if MATRIX_FUNCTIONS.iter().any(|func_name| func_name == &name) {
+                            return match name.as_str() {
+                                "det" => Ok(m.determinant()?.into()),
+                                "inv" => Ok(m.inverse()?.into()),
+                                //"ref" => Ok(m.row_echelon_form().into()),
+                                _ => Err(format!("Matrix passed to function '{}' that is not destructive.", name)),
                             }
+                        }
+                        // rule out non-matrix built-in functions if a matrix was passed in
+                        else {return Err(format!("Matrix passed to function '{}' that is not destructive.", name));}
+                    } else if let Some((arg_names, body, destruct)) = symbol_table.get_function(name) {
+                        // evaluate the function for every element of the matrix
+                        if destruct && evaled_args.len() == 1 {
+                            // store the arguments in a temporary symbol table
+                            let mut temp_symbol_table = symbol_table.clone();
+                            temp_symbol_table.remove_symbol(name); // prevent recursive calls
+                            let mut res_matrix: Vec<Fraction> = Vec::new();
+                            for f in m.clone() {
+                                temp_symbol_table.set_variable(arg_names[0].clone(), Box::new(f.into()));
+                                res_matrix.push(evaluate(&body, precision, previous_ans, &mut temp_symbol_table)?.into());
+                            }
+                            return Ok(Matrix::new_from_data(m.rows(), m.cols(), res_matrix)?.into());
                         }
                     }
                 }        
@@ -338,7 +358,7 @@ pub fn evaluate(
 
             // if they're all fractions
             if evaled_args.iter().all(|arg| matches!(arg, EvalResult::Fraction(_))) {
-                Ok(handle_frac(evaled_args.iter().map(|f| f.clone().into()).collect())?.into())
+                Ok(handle_frac_args(evaled_args.iter().map(|f| f.clone().into()).collect())?.into())
             } else {
                 handle_custom_func(name, evaled_args)
             }

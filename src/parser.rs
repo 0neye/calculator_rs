@@ -96,7 +96,7 @@ fn parse_function(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), Str
         if Token::DELIMITER("(".to_string()) == tokens[new_pos] {
             new_pos += 1;
             let node_res = parse_expression(tokens, new_pos);
-            if let Ok((node, next_pos)) = node_res {
+            if let Ok((node, next_pos)) = node_res.clone() {
                 new_pos = next_pos;
                 args.push(node);
                 while Token::DELIMITER(",".to_string()) == tokens[new_pos] {
@@ -110,32 +110,31 @@ fn parse_function(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), Str
                         Err(e) => return Err(e),
                     }
                 }
-                if Token::DELIMITER(")".to_string()) == tokens[new_pos] {
-                    new_pos += 1;
-                    // if there's a factorial, return a UniOp node
-                    if Token::OPERATOR("!".to_string()) == tokens[new_pos] {
-                        new_pos += 1;
-                        return Ok((
-                            factorial_node(Node::Function {
-                                name: name.to_string(),
-                                args,
-                            })?,
-                            new_pos,
-                        ))
-                    }
-                    // return the function node and the position in the token stream after parsing
+            } 
+            if Token::DELIMITER(")".to_string()) == tokens[new_pos] {
+                new_pos += 1;
+                // if there's a factorial, return a UniOp node
+                if Token::OPERATOR("!".to_string()) == tokens[new_pos] {
                     return Ok((
-                        Node::Function {
+                        factorial_node(Node::Function {
                             name: name.to_string(),
                             args,
-                        },
+                        })?,
                         new_pos,
-                    ));
-                } else {
-                    return Err("Expected closing parenthesis".to_string());
+                    ))
                 }
+                // return the function node and the position in the token stream after parsing
+                return Ok((
+                    Node::Function {
+                        name: name.to_string(),
+                        args,
+                    },
+                    new_pos,
+                ));
+            } else if node_res.is_err() {
+                return node_res; // return the error if it's not just because of the ending parenthesis
             } else {
-                return node_res; // return the error
+                return Err("Expected closing parenthesis".to_string());
             }
         }
     }
@@ -237,7 +236,7 @@ fn parse_atom(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String>
     // if it's a negative, return a UniOp node
     else if Token::OPERATOR("-".to_string()) == tokens[pos] {
         new_pos += 1;
-        let node_res = parse_expression(tokens, new_pos);
+        let node_res = parse_function(tokens, new_pos);
         match node_res {
             Ok((node, next_pos)) => {
                 new_pos = next_pos;
@@ -252,7 +251,7 @@ fn parse_atom(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), String>
             Err(e) => return Err(e),
         }
     }
-    Err("Expected number or opening parenthesis".to_string())
+    Err("Expected Atom".to_string())
 }
 
 /// small helper func
@@ -281,7 +280,7 @@ pub fn parse(tokens: & Vec<Token>) -> Result<Node, String> {
             if next_pos == tokens.len() - 1 {
                 return Ok(node);
             } else {
-                return Err("Expected end of expression".to_string());
+                return Err(format!("Expected end of expression. Stopped at '{:?}' (pos {})", tokens[next_pos], next_pos).to_string());
             }
         }
         Err(e) => return Err(e),

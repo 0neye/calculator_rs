@@ -44,11 +44,13 @@ pub fn get_tokens(input: &str) -> Result<Vec<Token>, String> {
             tokens.push(Token::OPERATOR(c.to_string()));
         } else if is_delimiter(&c) {
             tokens.push(Token::DELIMITER(c.to_string()));
-        } else if c.is_numeric() || c == '.' {
+        } else if c.is_numeric() || c == '.' || c == '`'{
             let mut current_token = c.to_string();
             while let Some(&c) = chars.peek() {
                 if c.is_numeric() || c == '.' {
                     current_token.push(c);
+                    chars.next();
+                } else if c == '`'{
                     chars.next();
                 } else {
                     break;
@@ -58,7 +60,7 @@ pub fn get_tokens(input: &str) -> Result<Vec<Token>, String> {
         } else if c.is_alphabetic() || c == '_' {
             let mut current_token = c.to_string();
             while let Some(&c) = chars.peek() {
-                if c.is_alphabetic() || c.is_numeric() || c == '_' {
+                if c.is_alphabetic() || c.is_numeric() || c == '_'{
                     current_token.push(c);
                     chars.next();
                 } else {

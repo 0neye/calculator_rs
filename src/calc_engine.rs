@@ -8,6 +8,8 @@ use malachite::num::logic::traits::SignificantBits;
 
 use malachite::{self, Integer, Natural, Rational};
 
+//TODO: make "num!" macro
+
 //wrapper
 #[derive(PartialEq, Eq, PartialOrd, Debug, Clone)]
 pub struct Fraction {
@@ -15,28 +17,48 @@ pub struct Fraction {
 }
 
 impl Fraction {
+    #[inline(always)]
     /// The constant pi.
     pub fn pi() -> Fraction {
-        Fraction::parse_decimal(
-            "3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821480865132823066470938446095505822317253594081284811174502841027019385211055596446229489549303819644288109756659334461284756482337867831652712019091456485669234603486104543266482133936072602491412737245870066063155881748815209209628292540917153643678925903600113305305488204665213841469519415116094330572703657595919530921861173819326117931051185480744623799627495673518857527248912279381830119491298336733624406566"
-        )
-        .unwrap()
+        // Fraction::parse_decimal(
+        //     "3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821480865132823066470938446095505822317253594081284811174502841027019385211055596446229489549303819644288109756659334461284756482337867831652712019091456485669234603486104543266482133936072602491412737245870066063155881748815209209628292540917153643678925903600113305305488204665213841469519415116094330572703657595919530921861173819326117931051185480744623799627495673518857527248912279381830119491298336733624406566"
+        // ).unwrap()
+        Fraction {
+            value: Rational::from_naturals(
+            Natural::from_limbs_asc(&[16015526629650925843, 3937736330497040659, 1060430482972443683, 10399108037880605619, 8722342527738386168, 12348386842194014499, 10456888439762154316, 6123312802475432784, 14473133155955814955, 3316851539658346146, 4008975686485604611, 13665342900331867789, 7367028535400513886, 10468695547307308229, 2523222716210950042, 14739891572339476236, 15103922911250320823, 12045249174508056803, 14932924909784619909, 14133008778476973700, 3030420747556997008, 9964611091800904359, 
+                2367976803570382958, 1146080508054429785, 15454708050572990171, 1573771280965505516, 19151689505232501]), 
+            Natural::from_limbs_asc(&[0, 0, 0, 0, 0, 0, 0, 0, 2947876186379141968, 17611692736084186179, 16707293993252985750, 18191887369100043212, 1010066148020621545, 13508309527881721771, 4120948427896168217, 5472735846129317792, 13926463604134851517, 14498716182408168085, 10592146117519359629, 16862044634572918105, 1854757136523561851, 781532325147078541, 5377723743440681581, 3403405907508723356, 11251568871083062745, 12898162146947153281, 6096172106637855])
+            )
+        }
     }
 
+    #[inline(always)]
     /// The natural logarithm of 10.
     fn ln10() -> Fraction {
-        Fraction::parse_decimal(
-            "2.3025850929940456840179914546843642076011014886287729760333279009675726096773524802359972050895982983419677840422862486334095254650828067566662873690987816894829072083255546808437998948262331985283935053089653777326288461633662222876982198867465436674744042432743651550489343149393914796194044002221051017141748003688084012647080685567743216228355220114804663715659121373450747856947683463616792101806445070648000277502684916746550586856935673420670581136429224554405758925724208241314695689016758940256776311356919292"
-        )
-        .unwrap()
+        // Fraction::parse_decimal(
+        //     "2.3025850929940456840179914546843642076011014886287729760333279009675726096773524802359972050895982983419677840422862486334095254650828067566662873690987816894829072083255546808437998948262331985283935053089653777326288461633662222876982198867465436674744042432743651550489343149393914796194044002221051017141748003688084012647080685567743216228355220114804663715659121373450747856947683463616792101806445070648000277502684916746550586856935673420670581136429224554405758925724208241314695689016758940256776311356919292"
+        // ).unwrap()
+        Fraction{
+            value: Rational::from_naturals(
+            Natural::from_limbs_asc(&[6546201492431733631, 15167238648806427950, 7721200715290770806, 12989992052497708677, 17430463276391498161, 8775086792721659178, 5949444383504965489, 
+                10501986357334362890, 15183387476595612190, 12374549391725404527, 1658246278310302591, 10447985775721052970, 7985866247887334149, 15794301743557623427, 14631767923104774157, 4178365717037319257, 6993080803111291073, 4067443610771871882, 2024493715143330430, 14456267422202451365, 4705301256809828273, 15445175022013487437, 17499162475290393377, 1877428196517740830, 3023116865352080502, 3204975913097886827, 7018477508535217]),
+            Natural::from_limbs_asc(&[0, 0, 0, 0, 0, 0, 0, 0, 10697310130044346792, 8805846368042093089, 8353646996626492875, 18319315721404797414, 9728405110865086580, 15977526800795636693, 2060474213948084108, 11959739959919434704, 16186603838922201566, 16472730128058859850, 14519445095614455622, 17654394354141234860, 10150750605116556733, 9614138199428315078, 2688861871720340790, 10925074990609137486, 14849156472396307180, 15672453110328352448, 3048086053318927]),
+            )
+        }
     }
 
+    #[inline(always)]
     /// The constant e.
     pub fn e() -> Fraction {
-        Fraction::parse_decimal(
-            "2.7182818284590452353602874713526624977572470936999595749669676277240766303535475945713821785251664274274663919320030599218174135966290435729003342952605956307381323286279434907632338298807531952510190115738341879307021540891499348841675092447614606680822648001684774118537423454424371075390777449920695517027618386062613313845830007520449338265602976067371132007093287091274437470472306969772093101416928368190255151086574637721112523897844250569536967707854499699679468644549059879316368892300987931277361782154249992"
-        )
-        .unwrap()
+        // Fraction::parse_decimal(
+        //     "2.7182818284590452353602874713526624977572470936999595749669676277240766303535475945713821785251664274274663919320030599218174135966290435729003342952605956307381323286279434907632338298807531952510190115738341879307021540891499348841675092447614606680822648001684774118537423454424371075390777449920695517027618386062613313845830007520449338265602976067371132007093287091274437470472306969772093101416928368190255151086574637721112523897844250569536967707854499699679468644549059879316368892300987931277361782154249992"
+        // ).unwrap()
+        Fraction {
+            value: Rational::from_naturals(
+            Natural::from_limbs_asc(&[11155792792291367137, 14843241099458555859, 9742054270963091109, 18428450497896879634, 681035353230862522, 14722925718561622299, 18207354264394167359, 14946518255153698470, 10783921601857590754, 7588981783146609963, 6696430093574571002, 8817351515305176225, 16863360264972537834, 16585578783233878458, 618057755987732159, 1589857981829012990, 14936706098823532224, 5425205516425713948, 9421205131929569441, 11389270005369564276, 16054835044392251151, 4220083976976521050, 15484145799462589151, 16154542886189831893, 6969920245932685420, 385256868788853586, 4142778465158145]),
+            Natural::from_limbs_asc(&[0, 0, 0, 0, 0, 0, 0, 0, 14572027101876949204, 13626295220875822352, 4176823498313246437, 9159657860702398707, 14087574592287319098, 7988763400397818346, 1030237106974042054, 5979869979959717352, 8093301919461100783, 8236365064029429925, 7259722547807227811, 18050569213925393238, 5075375302558278366, 4807069099714157539, 1344430935860170395, 5462537495304568743, 7424578236198153590, 17059598592018952032, 1524043026659463])
+            )
+        }
     }
 
     //new
@@ -220,6 +242,18 @@ impl Fraction {
             .trunc()
     }
 
+    /// Rounds to the provided decimal place
+    pub fn round_to_decimal(&self, place: &Fraction) -> Result<Fraction, String> {
+        if place.value < 0 {
+            return Err(format!("Cannot round to a negative decimal place: {}", place.to_string_decimal(10)));
+        } else if place.denom() != &Natural::from(1u8) {
+            return Err(format!("Cannot round to a non-integer decimal place: {}", place.to_string_decimal(10)));
+        }
+        let factor = Fraction::from(10u32).pow_frac(place, 10).unwrap();
+        let rounded = (self.multiply(&factor)).round();
+        Ok(rounded.divide(&factor))
+    }
+
     /// Gets the absolute value of a Fraction
     pub fn abs(&self) -> Fraction {
         Fraction {
@@ -394,10 +428,12 @@ impl Fraction {
     /// Takes the arbitrary-base log of a Fraction. <br>
     /// Uses x = e^(Ln(x)/n).
     pub fn log(&self, base: &Fraction, precision: u32) -> Result<Fraction, String> {
-        Ok(self
+        Ok(
+            self
             .ln(precision)?
             .divide(&base.ln(precision)?)
-            .trimed(precision))
+            .trimed(precision)
+        )
     }
 
     /// Gets the sine of a Fraction. <br>
@@ -630,13 +666,13 @@ impl Fraction {
         //dbg!(&fact.to_string_decimal(precision));
         //dbg!(&x.to_string_decimal(precision));
 
-        let res = x
+        Ok(
+            x
             .added_to(&Fraction::from(1))
             .gamma(precision)?
             .multiply(&fact)
-            .trimed(precision);
-
-        Ok(res)
+            .trimed(precision)
+        )
     }
 
     /// Takes a Fraction to an integer power.
@@ -811,40 +847,50 @@ impl Fraction {
         new
     }
 
-    //TODO: add a version of a rounding function that rounds to the closest decimal digit (like if there's 10 9s or 0s in a row)
-
     /// Returns a string representation of the fraction in decimal form.
     pub fn to_string_decimal(&self, precision: u32) -> String {
+        // TODO: fix for very small numbers with low precision (where it uses scientific notation)
         let mut options = ToSciOptions::default();
-        options.set_size_complete();
-        if self.value.fmt_sci_valid(options) {
-            self.value.to_sci_with_options(options).to_string()
-        } else {
-            let mut res = String::new();
-            if self.value < 0.0 {
-                res += "-";
-            }
-            res += &self.trunc().numer().to_string();
-            options = ToSciOptions::default();
-            options.set_precision(precision as u64);
-            if !self.value.fmt_sci_valid(options) {
-                options.set_precision(50);
-            }
-            if self.value.fmt_sci_valid(options) {
-                res.push_str(
-                    &self
-                        .fract()
-                        .abs()
-                        .value
-                        .to_sci_with_options(options)
-                        .to_string()[1..],
-                );
-            } else {
-                // if it's still not valid, use mixed number notation
-                return self.to_string_mixed(precision);
-            }
-            res
+        let mut res = String::new();
+        
+        if self.value < 0.0 {
+            res.push('-');
         }
+        res += &self.trunc().numer().to_string(); // the integer part
+        options.set_precision(precision as u64);
+        options.set_neg_exp_threshold(-(precision as i64));
+        if !self.value.fmt_sci_valid(options) {
+            options.set_precision(35); // fallback to 35
+        }
+        if self.value.fmt_sci_valid(options) {
+            res.push_str( // the fractional part
+                &self
+                    .fract()
+                    .abs()
+                    .value
+                    .to_sci_with_options(options)
+                    .to_string()[1..],
+            );
+        } else {
+            // if it's still not valid, use mixed number notation
+            return self.to_string_mixed(precision);
+        }
+        // add commas
+        let parts: Vec<&str> = res.split('.').collect();
+        let integer_part = parts[0];
+        let decimal_part = parts.get(1).unwrap_or(&"");
+        let is_negative = integer_part.starts_with("-");
+        let integer_part = if is_negative { &integer_part[1..] } else { integer_part };
+        let integer_with_commas = integer_part.chars().rev().enumerate().map(|(i, c)| {
+            if i % 3 == 0 && i != 0 {
+                format!(",{}", c)
+            } else {
+                c.to_string()
+            }
+        }).collect::<String>().chars().rev().collect::<String>();
+        let integer_with_commas = if is_negative { format!("-{}", integer_with_commas) } else { integer_with_commas };
+        res = if decimal_part.len() > 0 {format!("{}.{}", integer_with_commas, decimal_part)} else {integer_with_commas};
+        res
     }
 
     /// Returns a string representation of the fraction in mixed number form.
@@ -1257,7 +1303,7 @@ impl Matrix {
     }
 
     // Compute cofactor recursively 
-    fn cofactor(&self, row: usize, col: usize) -> Result<Fraction, String> {
+    pub fn cofactor(&self, row: usize, col: usize) -> Result<Fraction, String> {
 
         if self.rows != self.cols {
             return Err("Matrix must be square".to_string());
@@ -1298,7 +1344,7 @@ impl Matrix {
     }
 
     // Compute determinant recursively
-    fn determinant(&self) -> Result<Fraction, String> {
+    pub fn determinant(&self) -> Result<Fraction, String> {
         
         if self.rows == 1 {
             return Ok(self.data[0].clone());
@@ -1313,12 +1359,91 @@ impl Matrix {
         Ok(det)
     }
 
+    // REF
+    // TODO: doesn't work
+    pub fn to_row_echelon_form(&mut self) {
+        let mut pivot_row = 0;
+    
+        for pivot_col in 0..self.cols {
+            if pivot_row >= self.rows {
+                break;
+            }
+    
+            let mut max_row = pivot_row;
+            for r in (pivot_row + 1)..self.rows {
+                if self.data[r * self.cols + pivot_col].abs() > self.data[max_row * self.cols + pivot_col].abs() {
+                    max_row = r;
+                }
+            }
+    
+            if self.data[max_row * self.cols + pivot_col] == Fraction::zero() {
+                continue;
+            }
+    
+            self.swap_rows(pivot_row, max_row);
+    
+            let pivot = self.data[pivot_row * self.cols + pivot_col].clone();
+    
+            for r in (pivot_row + 1)..self.rows {
+                let scale = self.data[r * self.cols + pivot_col].clone() / pivot.clone();
+                for c in pivot_col..self.cols {
+                    let temp = self.data[pivot_row * self.cols + c].clone() * scale.clone();
+                    self.data[r * self.cols + c] -= temp;
+                }
+            }
+    
+            pivot_row += 1;
+        }
+    }
+    fn swap_rows(&mut self, i: usize, j: usize) {
+        for k in 0..self.cols {
+            self.data.swap(i * self.cols + k, j * self.cols + k);
+        }
+    }
+
+    pub fn row_echelon_form(&self) -> Matrix {
+        let mut m = self.clone();
+        m.to_row_echelon_form();
+        m
+    }
+
+    
+
     fn zeros(rows: usize, cols: usize) -> Matrix {
         Matrix {
             rows,
             cols,
             data: vec![Fraction::zero(); rows*cols],
         }
+    }
+
+
+    pub fn to_string_fmt(&self, frac_format_func: fn(&Fraction, u32) -> String, precision: u32) -> String {
+        let mut result = String::new();
+
+        if self.rows() > 1 && self.cols() > 0 {
+            result.push_str("\n");
+        }
+
+        let max_width = self.data.iter()
+            .map(|fraction| frac_format_func(fraction, precision).len())
+            .max()
+            .unwrap_or(0);
+
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                let fraction = &self.data[i * self.cols + j];
+                result.push_str(&format!("{:>width$}", frac_format_func(fraction, precision), width = max_width));
+                if j != self.cols - 1 {
+                    result.push_str(" ");
+                }
+            }
+            if i != self.rows - 1 {
+                result.push_str("\n");
+            }
+        }
+
+        result
     }
 
 }
@@ -1344,30 +1469,7 @@ use std::fmt;
 
 impl fmt::Display for Matrix {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        //println!("Matrix: {:?}", self);
-        if self.rows() > 1 && self.cols() > 0 {
-            write!(f, "\n")?;
-        }
-
-        let max_width = self.data.iter()
-            .map(|fraction| fraction.to_string_scientific(3).len())
-            .max()
-            .unwrap_or(0);
-
-        for i in 0..self.rows {
-            for j in 0..self.cols {
-                let fraction = &self.data[i * self.cols + j];
-                write!(f, "{:>width$}", fraction.to_string_scientific(3), width = max_width)?;
-                if j != self.cols - 1 {
-                    write!(f, " ")?;
-                }
-            }
-            if i != self.rows - 1 {
-                writeln!(f)?;
-            }
-        }
-
-        Ok(())
+        write!(f, "{}", self.to_string_fmt(Fraction::to_string_decimal, 3))
     }
 }
 
