@@ -621,6 +621,66 @@ impl Fraction {
         )
     }
 
+    /// Gets the hyperbolic sine of a Fraction
+    /// uses sinh(x) = (e^x - e^-x) / 2
+    pub fn sinh(&self, precision: u32) -> Result<Fraction, String> {
+        Ok(
+            (self.exp(precision)? - (-self).exp(precision)?) / FRAC_TWO.clone()
+        )
+    }
+
+    /// Gets the hyperbolic cosine of a Fraction
+    /// uses cosh(x) = (e^x + e^-x) / 2
+    pub fn cosh(&self, precision: u32) -> Result<Fraction, String> {
+        Ok(
+            (self.exp(precision)? + (-self).exp(precision)?) / FRAC_TWO.clone()
+        )
+    }
+
+    /// Gets the hyperbolic tangent of a Fraction
+    /// uses tanh(x) = sinh(x) / cosh(x)
+    pub fn tanh(&self, precision: u32) -> Result<Fraction, String> {
+        let cosh = self.cosh(precision)?;
+        if cosh == Fraction::zero() {
+            return Err("Division by zero in tanh calculation".to_string())
+        }
+        
+        Ok(
+            self.sinh(precision)? / cosh
+        )
+    }
+
+    /// Gets the inverse hyperbolic sine of a Fraction
+    /// uses asinh(x) = ln(x + sqrt(x^2 + 1))
+    pub fn asinh(&self, precision: u32) -> Result<Fraction, String> {
+        Ok(
+            (self.added_to(&(self.pow(&INT_TWO, precision)?.added_to(&FRAC_ONE)).nth_root(&FRAC_TWO, precision)?)).ln(precision)?
+        )
+    }
+
+    /// Gets the inverse hyperbolic cosine of a Fraction
+    /// uses acosh(x) = ln(x + sqrt(x^2 - 1))
+    pub fn acosh(&self, precision: u32) -> Result<Fraction, String> {
+        if *self < FRAC_ONE {
+            return Err("Input to acosh must be greater than or equal to 1".to_string())
+        }
+
+        Ok(
+            (self.clone() + (self.pow(&INT_TWO, precision)? - FRAC_ONE.clone()).nth_root(&FRAC_TWO, precision)?).ln(precision)?
+        )
+    }
+
+    /// Gets the inverse hyperbolic tangent of a Fraction
+    /// uses atanh(x) = (ln(1 + x) - ln(1 - x)) / 2
+    pub fn atanh(&self, precision: u32) -> Result<Fraction, String> {
+        if self.abs() >= FRAC_ONE {
+            return Err("Absolute value of input to atanh must be less than 1".to_string())
+        }
+
+        Ok(
+            ((FRAC_ONE.clone() + self.clone()) / (FRAC_ONE.clone() - self.clone())).ln(precision)? / FRAC_TWO.clone()
+        )
+    }
 
     /// Gets the factorial of an integer in Fraction form.
     pub fn factorial(&self) -> Result<Fraction, String> {

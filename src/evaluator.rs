@@ -53,15 +53,6 @@ const CUSTOM_FUNCTIONS: &[&str] = &[
     "si(p,r,t) = p * r * t", // simple interest formula
     "comb(n,r) = n! / (r!*(n-r)!)", // combination formula
     "perm(n,r) = n! / (n-r)!", // permutation formula
-
-    "sinh(x) = (exp(x) - exp(-x))/2", // hyperbolic sine formula
-    "cosh(x) = (exp(x) + exp(-x))/2", // hyperbolic cosine formula
-    "tanh(x) = sinh(x)/cosh(x)", // hyperbolic tangent formula
-    "asinh(x) = ln(x + root(x^2 + 1))", // inverse hyperbolic sine formula
-    "acosh(x) = ln(x + root(x^2 - 1))", // inverse hyperbolic cosine formula
-    "atanh(x) = 0.5*ln((1 + x)/(1 - x))", // inverse hyperbolic tangent formula
-    "asin(x) = atan(x/root(1 - x^2))", // inverse sine formula
-    "acos(x) = atan(root(1 - x^2)/x)", // inverse cosine formula
 ];
 
 const CUSTOM_VARS: &[&str] = &[
@@ -402,6 +393,14 @@ pub fn evaluate(
                     "cos" => args[0].cos(precision)?.into(),
                     "tan" => args[0].tan(precision)?.into(),
                     "atan" => args[0].atan(precision)?.into(),
+                    "asin" => args[0].asin(precision)?.into(),
+                    "acos" => args[0].acos(precision)?.into(),
+                    "sinh" => args[0].sinh(precision)?.into(),
+                    "cosh" => args[0].cosh(precision)?.into(),
+                    "tanh" => args[0].tanh(precision)?.into(),
+                    "atanh" => args[0].atanh(precision)?.into(),
+                    "asinh" => args[0].asinh(precision)?.into(),
+                    "acosh" => args[0].acosh(precision)?.into(),
                     "log" if args.len() == 1 => args[0].log(&10u32.into(), precision)?.into(),
                     "log" if args.len() == 2 => args[1].log(&args[0], precision)?.into(),
                     "ln" => args[0].ln(precision)?.into(),
