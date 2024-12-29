@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
-use crate::{calc_engine::Fraction, calc_engine::Matrix, parser::Node};
+use crate::{calc_engine::Fraction, calc_engine::Matrix, parser::{Node, self}, tokenizer};
 
 const FUNCTION_ARG_COUNT: &[(&str, usize)] = &[
     // fractions
     ("sin", 1),
     ("cos", 1),
     ("tan", 1),
+    ("atan", 1),
     ("log", 2),
     ("ln", 1),
     ("exp", 1),
@@ -19,13 +20,66 @@ const FUNCTION_ARG_COUNT: &[(&str, usize)] = &[
     ("det", 1),
     ("inv", 1),
     ("ref", 1),
+    ("mean", 1),
+    ("median", 1),
+    ("mode", 1),
+    ("sum", 1),
+    ("prod", 1),
 ];
 // TODO: rework how built-in functions are stored
 const MATRIX_FUNCTIONS: &[&str] = &[
     "det",
     "inv",
     "ref",
+    "mean",
+    "median",
+    "mode",
+    "sum",
+    "prod",
 ];
+
+// functions using the calculator syntax, need to be initialized with the parser
+const CUSTOM_FUNCTIONS: &[&str] = &[
+    "quad(a,b,c) = [(-b + root(b^2 - 4*a*c))/(2*a), (-b - root(b^2 - 4*a*c))/(2*a)]", // quadratic formula
+
+    "pva(r,n,pmt) = pmt * (1 - (1 + r)^-n) / r", // present value formula (annuity)
+    "fva(r,n,pmt) = pmt * ((1 + r)^n - 1) / r", // future value formula (annuity)
+    "pv(fv,r,n) = fv / (1+r)^n", // present value formula
+    "fv(pv,r,n) = pv * (1+r)^n", // future value formula
+    "pmt(pv,fv,r,n) = (pv - fv) / ((1 + r)^n - 1)", // payment formula
+    "nper(pmt,r,fv) = log(fv / pmt) / log(1 + r)", // number of periods
+    "pci(p,r,t,n) = p * (1 + r/n)^(n*t)", // periodic compound interest formula
+    "cci(p,r,t) = p * exp(r*t)", // continuous compound interest formula
+    "si(p,r,t) = p * r * t", // simple interest formula
+    "comb(n,r) = n! / (r!*(n-r)!)", // combination formula
+    "perm(n,r) = n! / (n-r)!", // permutation formula
+
+    "sinh(x) = (exp(x) - exp(-x))/2", // hyperbolic sine formula
+    "cosh(x) = (exp(x) + exp(-x))/2", // hyperbolic cosine formula
+    "tanh(x) = sinh(x)/cosh(x)", // hyperbolic tangent formula
+    "asinh(x) = ln(x + root(x^2 + 1))", // inverse hyperbolic sine formula
+    "acosh(x) = ln(x + root(x^2 - 1))", // inverse hyperbolic cosine formula
+    "atanh(x) = 0.5*ln((1 + x)/(1 - x))", // inverse hyperbolic tangent formula
+    "asin(x) = atan(x/root(1 - x^2))", // inverse sine formula
+    "acos(x) = atan(root(1 - x^2)/x)", // inverse cosine formula
+];
+
+const CUSTOM_VARS: &[&str] = &[
+    "h = 100",
+    "k = 1`000",
+    "mill = 1`000`000",
+    "bill = 1`000`000`000",
+    "m = 1`000`000",
+    "b = 1`000`000`000",
+];
+
+pub fn init_custom_symbols(symbol_table: &mut SymbolTable) {
+    for symbol in CUSTOM_FUNCTIONS.iter().chain(CUSTOM_VARS.iter()) {
+        let tokens = tokenizer::get_tokens(symbol).unwrap();
+        let parsed = parser::parse(&tokens).unwrap();
+        let _ = evaluate(&parsed, 20, None, symbol_table);
+    }
+}
 
 #[derive(Clone)]
 pub enum Symbol{
@@ -37,6 +91,23 @@ pub enum Symbol{
         destruct: bool, // whether the function operates on each element of a matrix instead of the whole matrix
     }
 }
+
+impl Symbol {
+    pub fn to_string(&self) -> String {
+        match self {
+            Symbol::Variable(var_name, value) => {
+                format!("Variable: {} = {}", var_name, value.to_string())
+            },
+            Symbol::FunctionDef { name, arg_names, body, destruct } => {
+                let args = arg_names.join(", ");
+                format!("Function: {}({}) = {}", name, 
+                    if *destruct { format!("[{}]", args) } else { args }, 
+                    body.to_string())
+            },
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct SymbolTable {
     symbols: Vec<Symbol>,
@@ -104,6 +175,25 @@ impl SymbolTable {
             }
         });
     }
+
+    pub fn get_symbol_string(&self, name: &str) -> String {
+        self.symbols.iter()
+            .find(|symbol| match symbol {
+                Symbol::Variable(var_name, _) => var_name == name,
+                Symbol::FunctionDef { name: func_name, .. } => func_name == name,
+            })
+            .map(|symbol| symbol.to_string())
+            .unwrap_or_else(|| format!("Symbol not found: {}", name))
+    }
+
+    pub fn get_symbol_string_list(&self) -> String {
+        let mut output = String::new();
+        for symbol in &self.symbols {
+            output.push_str(&symbol.to_string());
+            output.push('\n');
+        }
+        output.trim_end().to_string()
+    }
     
 }
 
@@ -138,6 +228,18 @@ impl From<EvalResult> for Matrix {
         }
     }
 }
+
+impl ToString for EvalResult {
+    fn to_string(&self) -> String {
+        match self {
+            EvalResult::Fraction(fraction) => fraction.to_string(),
+            EvalResult::Matrix(matrix) => matrix.to_string(),
+        }
+    }
+}
+
+
+
 
 
 /// Evaluate a node tree representation of a math expression
@@ -299,6 +401,7 @@ pub fn evaluate(
                     "sin" => args[0].sin(precision)?.into(),
                     "cos" => args[0].cos(precision)?.into(),
                     "tan" => args[0].tan(precision)?.into(),
+                    "atan" => args[0].atan(precision)?.into(),
                     "log" if args.len() == 1 => args[0].log(&10u32.into(), precision)?.into(),
                     "log" if args.len() == 2 => args[1].log(&args[0], precision)?.into(),
                     "ln" => args[0].ln(precision)?.into(),
@@ -333,6 +436,11 @@ pub fn evaluate(
                             return match name.as_str() {
                                 "det" => Ok(m.determinant()?.into()),
                                 "inv" => Ok(m.inverse()?.into()),
+                                "mean" => Ok(m.mean()?.into()),
+                                "median" => Ok(m.median()?.into()),
+                                "mode" => Ok(m.mode()?.into()),
+                                "sum" => Ok(m.sum().into()),
+                                "prod" => Ok(m.prod().into()),
                                 //"ref" => Ok(m.row_echelon_form().into()),
                                 _ => Err(format!("Matrix passed to function '{}' that is not destructive.", name)),
                             }
@@ -364,8 +472,8 @@ pub fn evaluate(
             }
         },
         Node::Identifier(id) => match id.as_str() {
-            "pi" => Ok(Fraction::pi().into()),
-            "e" => Ok(Fraction::e().into()),
+            "pi" => Ok(Fraction::pi().clone().into()),
+            "e" => Ok(Fraction::e().clone().into()),
             "last" => match previous_ans {
                 Some(f) => Ok(f.clone().into()),
                 None => Err("No previous answer".to_string()),

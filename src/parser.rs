@@ -25,6 +25,62 @@ pub enum Node {
 }
 
 
+impl Node {
+    pub fn to_string(&self) -> String {
+        // Helper function to determine precedence of operators
+        let has_less_precedence = |op1: &str, op2: &str| -> bool {
+            // Precedence levels for common operators, lower number means higher precedence
+            let precedence = |op| match op {
+                "^" => 1,
+                "*" | "/" => 2,
+                "+" | "-" => 3,
+                _ => 4, // Default precedence for unknown operators
+            };
+        
+            precedence(op1) > precedence(op2)
+        };
+
+        match self {
+            Node::UniOp { op, child } => {
+                match **child {
+                    Node::Number(_) | Node::Identifier(_) =>                 
+                        if op == "!" {
+                            format!("{}!", child.to_string())
+                        } else {
+                            format!("{}{}", op, child.to_string())
+                        }
+                    _ => format!("({}{})", op, child.to_string()),
+                }
+            },
+            Node::BinOp { op: this_op, left, right } => {
+                let left_str = match **left {
+                    Node::BinOp { ref op, .. } if has_less_precedence(op, this_op) => format!("({})", left.to_string()),
+                    _ => left.to_string(),
+                };
+                let right_str = match **right {
+                    Node::BinOp { ref op, .. } if has_less_precedence(op, this_op) => format!("({})", right.to_string()),
+                    _ => right.to_string(),
+                };
+                format!("{} {} {}", left_str, this_op, right_str)
+            },
+            Node::Function { name, args } => {
+                let args_str = args.iter().map(|arg| arg.to_string()).collect::<Vec<String>>().join(", ");
+                format!("{}({})", name, args_str)
+            },
+            Node::Identifier(id) => id.clone(),
+            Node::Number(num) => num.to_string(),
+            Node::Matrix(matrix) => {
+                let matrix_str = matrix.iter().map(|row| {
+                    row.iter().map(|elem| elem.to_string()).collect::<Vec<String>>().join(", ")
+                }).collect::<Vec<String>>().join("; ");
+                format!("[{}]", matrix_str)
+            },
+        }
+    }
+
+}
+
+
 /// Parses an expression with the given binary operators
 /// Calls the given function pointer when done
 fn parse_generic_bin_op(
@@ -113,24 +169,18 @@ fn parse_function(tokens: & Vec<Token>, pos: usize) -> Result<(Node, usize), Str
             } 
             if Token::DELIMITER(")".to_string()) == tokens[new_pos] {
                 new_pos += 1;
-                // if there's a factorial, return a UniOp node
+                let function_node = Node::Function {
+                    name: name.to_string(),
+                    args,
+                };
+                
+                // Check for factorial after the closing parenthesis
                 if Token::OPERATOR("!".to_string()) == tokens[new_pos] {
-                    return Ok((
-                        factorial_node(Node::Function {
-                            name: name.to_string(),
-                            args,
-                        })?,
-                        new_pos,
-                    ))
+                    new_pos += 1;
+                    return Ok((factorial_node(function_node)?, new_pos));
                 }
-                // return the function node and the position in the token stream after parsing
-                return Ok((
-                    Node::Function {
-                        name: name.to_string(),
-                        args,
-                    },
-                    new_pos,
-                ));
+                
+                return Ok((function_node, new_pos));
             } else if node_res.is_err() {
                 return node_res; // return the error if it's not just because of the ending parenthesis
             } else {

@@ -6,6 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-malachite = "0.4.4"
+malachite = ">=0.4.4"
 fieri = "0.6.0"
-tokio = "1.24.2"
+tokio = { version = ">=1.24.2", features = ["full"] }

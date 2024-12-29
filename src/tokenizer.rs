@@ -80,11 +80,12 @@ pub fn get_tokens(input: &str) -> Result<Vec<Token>, String> {
     }
     tokens.push(Token::EOE);
 
-    // add implicit multiplication tokens
+    // add implicit multiplication tokens and other static replacement
     let mut new_tokens: Vec<Token> = Vec::new();
 
     for i in 0..tokens.len() {
         if i > 0 {
+            // implicit multiplication
             if let Token::NUMBER(_) = tokens[i - 1] {
                 if let Token::DELIMITER(ref d) = tokens[i] {
                     if d == "(" {
@@ -104,6 +105,14 @@ pub fn get_tokens(input: &str) -> Result<Vec<Token>, String> {
                     } else if let Token::IDENTIFIER(_) = &tokens[i] {
                         new_tokens.push(Token::OPERATOR("*".to_string()));
                     }
+                }
+            }
+            // static replacements
+            if let Token::OPERATOR(ref op) = tokens[i] {
+                if op == "%" {
+                    new_tokens.push(Token::OPERATOR("*".to_string()));
+                    new_tokens.push(Token::NUMBER(Fraction::from_str("0.01").unwrap()));
+                    continue;
                 }
             }
         }

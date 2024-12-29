@@ -1,5 +1,6 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 use std::str::FromStr;
+use std::sync::OnceLock;
 
 use malachite::num::arithmetic::traits::{Abs, Ceiling, Floor, Mod, Pow, Reciprocal};
 use malachite::num::conversion::string::options::ToSciOptions;
@@ -10,8 +11,13 @@ use malachite::{self, Integer, Natural, Rational};
 
 //TODO: make "num!" macro
 
+static INT_ONE: Integer = Integer::const_from_signed(1i64);
+static INT_TWO: Integer = Integer::const_from_signed(2i64);
+static FRAC_ONE: Fraction = Fraction::const_new(Rational::const_from_signed(1i64));
+static FRAC_TWO: Fraction = Fraction::const_new(Rational::const_from_signed(2i64));
+
 //wrapper
-#[derive(PartialEq, Eq, PartialOrd, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Debug, Clone, Hash, Ord)]
 pub struct Fraction {
     value: Rational,
 }
@@ -19,10 +25,13 @@ pub struct Fraction {
 impl Fraction {
     #[inline(always)]
     /// The constant pi.
-    pub fn pi() -> Fraction {
+    pub fn pi() -> &'static Fraction {
         // Fraction::parse_decimal(
         //     "3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821480865132823066470938446095505822317253594081284811174502841027019385211055596446229489549303819644288109756659334461284756482337867831652712019091456485669234603486104543266482133936072602491412737245870066063155881748815209209628292540917153643678925903600113305305488204665213841469519415116094330572703657595919530921861173819326117931051185480744623799627495673518857527248912279381830119491298336733624406566"
         // ).unwrap()
+
+        static PI: OnceLock<Fraction> = OnceLock::new();
+        PI.get_or_init(|| {
         Fraction {
             value: Rational::from_naturals(
             Natural::from_limbs_asc(&[16015526629650925843, 3937736330497040659, 1060430482972443683, 10399108037880605619, 8722342527738386168, 12348386842194014499, 10456888439762154316, 6123312802475432784, 14473133155955814955, 3316851539658346146, 4008975686485604611, 13665342900331867789, 7367028535400513886, 10468695547307308229, 2523222716210950042, 14739891572339476236, 15103922911250320823, 12045249174508056803, 14932924909784619909, 14133008778476973700, 3030420747556997008, 9964611091800904359, 
@@ -30,35 +39,40 @@ impl Fraction {
             Natural::from_limbs_asc(&[0, 0, 0, 0, 0, 0, 0, 0, 2947876186379141968, 17611692736084186179, 16707293993252985750, 18191887369100043212, 1010066148020621545, 13508309527881721771, 4120948427896168217, 5472735846129317792, 13926463604134851517, 14498716182408168085, 10592146117519359629, 16862044634572918105, 1854757136523561851, 781532325147078541, 5377723743440681581, 3403405907508723356, 11251568871083062745, 12898162146947153281, 6096172106637855])
             )
         }
+        })
     }
 
     #[inline(always)]
     /// The natural logarithm of 10.
-    fn ln10() -> Fraction {
+    pub fn ln10() -> &'static Fraction {
         // Fraction::parse_decimal(
         //     "2.3025850929940456840179914546843642076011014886287729760333279009675726096773524802359972050895982983419677840422862486334095254650828067566662873690987816894829072083255546808437998948262331985283935053089653777326288461633662222876982198867465436674744042432743651550489343149393914796194044002221051017141748003688084012647080685567743216228355220114804663715659121373450747856947683463616792101806445070648000277502684916746550586856935673420670581136429224554405758925724208241314695689016758940256776311356919292"
         // ).unwrap()
+        static LN10: OnceLock<Fraction> = OnceLock::new();
+        LN10.get_or_init(||
         Fraction{
             value: Rational::from_naturals(
             Natural::from_limbs_asc(&[6546201492431733631, 15167238648806427950, 7721200715290770806, 12989992052497708677, 17430463276391498161, 8775086792721659178, 5949444383504965489, 
                 10501986357334362890, 15183387476595612190, 12374549391725404527, 1658246278310302591, 10447985775721052970, 7985866247887334149, 15794301743557623427, 14631767923104774157, 4178365717037319257, 6993080803111291073, 4067443610771871882, 2024493715143330430, 14456267422202451365, 4705301256809828273, 15445175022013487437, 17499162475290393377, 1877428196517740830, 3023116865352080502, 3204975913097886827, 7018477508535217]),
             Natural::from_limbs_asc(&[0, 0, 0, 0, 0, 0, 0, 0, 10697310130044346792, 8805846368042093089, 8353646996626492875, 18319315721404797414, 9728405110865086580, 15977526800795636693, 2060474213948084108, 11959739959919434704, 16186603838922201566, 16472730128058859850, 14519445095614455622, 17654394354141234860, 10150750605116556733, 9614138199428315078, 2688861871720340790, 10925074990609137486, 14849156472396307180, 15672453110328352448, 3048086053318927]),
             )
-        }
+        })
     }
 
     #[inline(always)]
     /// The constant e.
-    pub fn e() -> Fraction {
+    pub fn e() -> &'static Fraction {
         // Fraction::parse_decimal(
         //     "2.7182818284590452353602874713526624977572470936999595749669676277240766303535475945713821785251664274274663919320030599218174135966290435729003342952605956307381323286279434907632338298807531952510190115738341879307021540891499348841675092447614606680822648001684774118537423454424371075390777449920695517027618386062613313845830007520449338265602976067371132007093287091274437470472306969772093101416928368190255151086574637721112523897844250569536967707854499699679468644549059879316368892300987931277361782154249992"
         // ).unwrap()
+        static E: OnceLock<Fraction> = OnceLock::new();
+        E.get_or_init(||
         Fraction {
             value: Rational::from_naturals(
             Natural::from_limbs_asc(&[11155792792291367137, 14843241099458555859, 9742054270963091109, 18428450497896879634, 681035353230862522, 14722925718561622299, 18207354264394167359, 14946518255153698470, 10783921601857590754, 7588981783146609963, 6696430093574571002, 8817351515305176225, 16863360264972537834, 16585578783233878458, 618057755987732159, 1589857981829012990, 14936706098823532224, 5425205516425713948, 9421205131929569441, 11389270005369564276, 16054835044392251151, 4220083976976521050, 15484145799462589151, 16154542886189831893, 6969920245932685420, 385256868788853586, 4142778465158145]),
             Natural::from_limbs_asc(&[0, 0, 0, 0, 0, 0, 0, 0, 14572027101876949204, 13626295220875822352, 4176823498313246437, 9159657860702398707, 14087574592287319098, 7988763400397818346, 1030237106974042054, 5979869979959717352, 8093301919461100783, 8236365064029429925, 7259722547807227811, 18050569213925393238, 5075375302558278366, 4807069099714157539, 1344430935860170395, 5462537495304568743, 7424578236198153590, 17059598592018952032, 1524043026659463])
             )
-        }
+        })
     }
 
     //new
@@ -66,6 +80,10 @@ impl Fraction {
         Fraction {
             value: Rational::from_integers(Integer::from(numerator), Integer::from(denominator)),
         }
+    }
+
+    pub const fn const_new(frac: Rational) -> Fraction {
+        Fraction { value: frac }
     }
 
     //new from big ints
@@ -118,7 +136,7 @@ impl Fraction {
             // get the numerator
             let numerator = Integer::from_str(s).unwrap();
             // get the denominator
-            let denominator = Integer::from(1);
+            let denominator = &INT_ONE;
             // return the fraction
             Some(Fraction::new_from_big_ints(&numerator, &denominator))
         }
@@ -281,12 +299,12 @@ impl Fraction {
         // if numerator is 0
         if self.value == 0.0 {
             //return 1
-            return Ok(Fraction::from(1));
+            return Ok(FRAC_ONE.clone());
         }
         // if it's negative
         if self.value < 0.0 {
             //return 1 / (e ^ -x)
-            return Ok(Fraction::from(1).divide(&self.negate().exp(precision)?));
+            return Ok(FRAC_ONE.divide(&self.negate().exp(precision)?));
         }
         // if the input is too large
         if self.value > 5000000.0 {
@@ -316,13 +334,13 @@ impl Fraction {
 
         const MAX_LOOP_TIMES: u32 = 1000;
         let STOP_AFTER: Fraction = Fraction::new_from_big_ints(
-            &Integer::from(1),
+            &INT_ONE,
             &Integer::from(precision).pow(precision as u64 / 10),
         );
 
         // initialize the last term and the sum
         let mut last_term = self.trimed(precision);
-        let mut sum = Fraction::from(1).added_to(&last_term);
+        let mut sum = FRAC_ONE.added_to(&last_term);
 
         // iterate until the last term is small enough
         for i in 1..MAX_LOOP_TIMES {
@@ -378,7 +396,7 @@ impl Fraction {
         // break frac into a * 10^b or do Ln(a) + b * Ln(10) where b is the power of 10 to get a < ln10
         let mut frac = self.clone();
         let mut b = 0;
-        if frac > Fraction::ln10() {
+        if frac > *Fraction::ln10() {
             b = num_decimal_digits(frac.trunc().numer()) as i64 - 2;
             if b < 0 {
                 b = 0;
@@ -389,13 +407,13 @@ impl Fraction {
 
         const MAX_LOOP_TIMES: u32 = 500;
         let STOP_AFTER: Fraction = Fraction::new_from_big_ints(
-            &Integer::from(1),
+            &INT_ONE,
             &Integer::from(precision).pow(precision as u64 / 10),
         );
 
         // calculate the value of (frac - 1) / (frac + 1)
-        let num_1_less_over_1_more = ((frac.clone() - Fraction::from(1))
-            / (frac.clone() + Fraction::from(1)))
+        let num_1_less_over_1_more = ((frac.clone().subtract(&FRAC_ONE))
+            / (frac.clone().added_to(&FRAC_ONE)))
         .trimed(precision);
 
         // initialize the sum to 0
@@ -420,7 +438,7 @@ impl Fraction {
             sum.trim(precision);
         }
         // scale back up
-        let result = sum * Fraction::from(2) + Fraction::from(b).multiply(&Fraction::ln10());
+        let result = (sum.multiply(&FRAC_TWO)).added_to(&Fraction::from(b).multiply(&Fraction::ln10()));
 
         Ok(result.trimed(precision))
     }
@@ -445,7 +463,7 @@ impl Fraction {
     // lastTerm = self      stop when the terms are adding less than "STOP_AFTER"
     //         0
     pub fn sin(&self, precision: u32) -> Result<Fraction, String> {
-        let pi2 = &(Fraction::pi() * Fraction::from(2));
+        let pi2 = &Fraction::pi().multiply(&FRAC_TWO);
 
         //scale within abs of 2 pi
         let mut scaled = self.clone();
@@ -464,7 +482,7 @@ impl Fraction {
 
         const MAX_LOOP_TIMES: i64 = 500;
         let STOP_AFTER: Fraction = Fraction::new_from_big_ints(
-            &Integer::from(1),
+            &INT_ONE,
             &Integer::from(precision).pow(precision as u64 / 10),
         );
 
@@ -477,7 +495,7 @@ impl Fraction {
             // calculate the value of the current term
             let this_term = last_term
                 .multiply(
-                    &(-scaled.clone().pow(&Integer::from(2), precision)?)
+                    &(-scaled.clone().pow(&INT_TWO, precision)?)
                         .divide(&Fraction::from(2 * i * (2 * i + 1))),
                 )
                 .trimed(precision);
@@ -502,7 +520,7 @@ impl Fraction {
     /// Gets the cosine of a Fraction. <br>
     /// Uses sine and shifts the input by pi/2.
     pub fn cos(&self, precision: u32) -> Result<Fraction, String> {
-        Ok((self.added_to(&Fraction::pi().divide(&Fraction::from(2)))).sin(precision)?)
+        Ok((self.added_to(&Fraction::pi().divide(&FRAC_TWO))).sin(precision)?)
     }
 
     /// Gets the tangent of a Fraction. <br>
@@ -510,6 +528,106 @@ impl Fraction {
     pub fn tan(&self, precision: u32) -> Result<Fraction, String> {
         Ok(self.sin(precision)?.divide(&self.cos(precision)?))
     }
+
+    /// Gets the arctangent of a Fraction <br>
+    /// Uses taylor series from https://github.com/microsoft/calculator/blob/main/src/CalcManager/Ratpack/itrans.cpp
+    //    n
+    //   ___                                                   2
+    //   \  ]                                            (2j)*X (-1^j)
+    //    \   thisterm  ; where thisterm   = thisterm  * ---------
+    //    /           j                 j+1          j   (2j+2)
+    //   /__]
+    //   j=0
+    //
+    //   thisterm  = X ;  and stop when thisterm < precision used.
+    //           0                              n
+    //
+    //   If abs(x) > 0.85 then an alternate form is used (probably not faster for me since it uses this function anyway)
+    //      asin(x/sqrt(1+x^2))
+    //
+    //   And if abs(x) > 2.0 then this form is used.
+    //   pi/2 - atan(1/x)
+    // TODO: fix slightly undershooting answer
+    // https://en.wikipedia.org/wiki/Horner's_method
+    pub fn atan(&self, precision: u32) -> Result<Fraction, String> {
+        if self.value < 0.0 {
+            return Ok(Self::atan(&self.negate(), precision)?.negate());
+        }
+
+        if self.abs().value > 0.85 { // TODO: replace/remove this
+            return Ok(Self::asin(&self.divide(&FRAC_ONE.added_to(&self.pow(&INT_TWO, precision)?).nth_root(&FRAC_TWO, precision)?), precision)?);
+        }
+
+        if self.abs() > FRAC_TWO {
+            return Ok(Self::pi().divide(&FRAC_TWO).subtract(&Self::atan(&self.recip(), precision)?));
+        }
+
+        const MAX_LOOP_TIMES: i64 = 500;
+        let STOP_AFTER: Fraction = Fraction::new_from_big_ints(
+            &INT_ONE,
+            &Integer::from(precision).pow(precision as u64 / 10),
+        );
+
+        let x_squared = self.pow(&INT_TWO, precision)?;
+
+        let mut last_term = self.clone();
+        let mut sum = self.clone();
+        let mut sign = Fraction::from(-1);
+
+        for j in 1..MAX_LOOP_TIMES {
+            let j2 = Fraction::from(j*2);
+
+            let this_term = last_term
+                .multiply(&j2.multiply(&x_squared)).multiply(&sign)
+                .divide(&j2.added_to(&FRAC_TWO)).trimed(precision);
+
+            println!("{}",&sum.to_string_decimal(15));
+            // add this term to the sum
+            sum = sum.added_to(&this_term);
+
+            // check if the term is small enough
+            if this_term.abs() < STOP_AFTER {
+                break;
+            }
+
+            // update the last term
+            last_term = this_term;
+            sign = sign.negate();
+
+            // trim the sum to the required precision
+            sum.trim(precision);
+        }
+
+        Ok(sum)
+    }
+
+    /// Gets the arcsine of a Fraction
+    /// uses asin(x) = 2atan(x/sqrt(1-x^2))
+    pub fn asin(&self, precision: u32) -> Result<Fraction, String> {
+        if self.abs() > FRAC_ONE {
+            return Err("Absolute value of input to asin must be less than or equal to 1".to_string());
+        }
+
+        Ok(
+            Self::atan(
+                &self.divide(
+                    &FRAC_ONE.subtract(&self.pow(&INT_TWO, precision)?).nth_root(&FRAC_TWO, precision)?), precision)?
+            .multiply(&FRAC_TWO)
+        )
+    }
+
+    /// Gets the arccosine of a Fraction
+    /// uses acos(x) = pi/2 - asin(x)
+    pub fn acos(&self, precision: u32) -> Result<Fraction, String> {
+        if self.abs() > FRAC_ONE {
+            return Err("Absolute value of input to acos must be less than or equal to 1".to_string());
+        }
+
+        Ok(
+            Self::pi().divide(&FRAC_TWO).subtract(&self.asin(precision)?)
+        )
+    }
+
 
     /// Gets the factorial of an integer in Fraction form.
     pub fn factorial(&self) -> Result<Fraction, String> {
@@ -525,11 +643,11 @@ impl Fraction {
                 self.to_string_decimal(20)
             ));
         }
-        let mut result = Fraction::from(1);
-        let mut i = Fraction::from(1);
+        let mut result = FRAC_ONE.clone();
+        let mut i = FRAC_ONE.clone();
         while i <= *self {
             result.mul_assign(&i);
-            i.add_assign(&Fraction::from(1));
+            i.add_assign(&FRAC_ONE);
         }
         Ok(result)
     }
@@ -564,7 +682,7 @@ impl Fraction {
             .divide(self)
             .ln(LN_PRECISION)?
             .multiply(&Fraction::from(BASE))
-            .added_to(&Fraction::from(1));
+            .added_to(&FRAC_ONE);
         a.add_assign(&self.multiply(&a.ln(LN_PRECISION)?));
         a.trim(precision);
 
@@ -585,7 +703,7 @@ impl Fraction {
             .divide(&Fraction::from(BASE));
 
         // first term (when j is 0)
-        let mut sum = self.recip() - &a / &(self + &Fraction::from(1));
+        let mut sum = self.recip() - &a / &(self + &FRAC_ONE);
 
         let a_pow_2 = &a.multiply(&a);
         let mut a_pow_j2 = a_pow_2.clone();
@@ -604,7 +722,7 @@ impl Fraction {
             let part3 = a
                 .divide(
                     &n_plus_2j
-                        .added_to(&Fraction::from(1))
+                        .added_to(&FRAC_ONE)
                         .multiply(&Fraction::from(j2 + 1)),
                 )
                 .trimed(precision);
@@ -652,14 +770,14 @@ impl Fraction {
         // scale down
         // to the corresponding number between -1 and 0 that gives the same result
         // no idea how they figured out these specific loops
-        let mut fact = Fraction::from(1);
+        let mut fact = FRAC_ONE.clone();
         let mut x = self.clone();
         while x.value > 0.0 {
             fact.mul_assign(&x);
-            x.sub_assign(&Fraction::from(1));
+            x.sub_assign(&FRAC_ONE);
         }
         while x.value < -1.0 {
-            x.add_assign(&Fraction::from(1));
+            x.add_assign(&FRAC_ONE);
             fact.div_assign(&x);
         }
 
@@ -668,7 +786,7 @@ impl Fraction {
 
         Ok(
             x
-            .added_to(&Fraction::from(1))
+            .added_to(&FRAC_ONE)
             .gamma(precision)?
             .multiply(&fact)
             .trimed(precision)
@@ -679,8 +797,8 @@ impl Fraction {
     fn pow(&self, exponent: &Integer, precision: u32) -> Result<Fraction, String> {
         // if the exponent is 0 or 1
         if exponent == &0 {
-            return Ok(Fraction::from(1));
-        } else if exponent == &Integer::from(1) {
+            return Ok(FRAC_ONE.clone());
+        } else if exponent == &INT_ONE {
             return Ok(self.clone());
         }
         // if the exponent is negative
@@ -692,7 +810,7 @@ impl Fraction {
         // exponentiation by squaring
         // https://en.wikipedia.org/wiki/Exponentiation_by_squaring
         // initialize the result
-        let mut result = Fraction::from(1);
+        let mut result = FRAC_ONE.clone();
 
         // clone the fraction
         let mut frac = self.clone();
@@ -746,7 +864,7 @@ impl Fraction {
 
         if exponent.value == 0.0 {
             //return 1
-            return Ok(Fraction::from(1));
+            return Ok(FRAC_ONE.clone());
         }
         if self.value == 0.0 {
             //return 0
@@ -756,7 +874,7 @@ impl Fraction {
             //return 1 / x ^ -n
             return Ok(self.pow_frac(&-exponent.clone(), precision)?.recip());
         }
-        if self == &Fraction::e() {
+        if self == Fraction::e() {
             //return e ^ n
             return Ok(exponent.exp(precision)?);
         }
@@ -835,7 +953,7 @@ impl Fraction {
         let distance = Fraction::parse_decimal("0.0000000000000000000000001").unwrap();
         let frac_part = self.fract().abs();
         // if the fraction is less than the distance from the nearest integer
-        if frac_part < distance || frac_part > (&Fraction::from(1) - &distance) {
+        if frac_part < distance || frac_part > (&FRAC_ONE - &distance) {
             self.value = self.round().value;
         }
     }
@@ -967,23 +1085,23 @@ impl From<u32> for Fraction {
 //from Integer
 impl From<&Integer> for Fraction {
     fn from(n: &Integer) -> Fraction {
-        Fraction::new_from_big_ints(n, &Integer::from(1))
+        Fraction::new_from_big_ints(n, &INT_ONE)
     }
 }
 impl From<Integer> for Fraction {
     fn from(n: Integer) -> Fraction {
-        Fraction::new_from_big_ints(&n, &Integer::from(1))
+        Fraction::new_from_big_ints(&n, &INT_ONE)
     }
 }
 //from Natural
 impl From<&Natural> for Fraction {
     fn from(n: &Natural) -> Fraction {
-        Fraction::new_from_big_ints(&Integer::from(n), &Integer::from(1))
+        Fraction::new_from_big_ints(&Integer::from(n), &INT_ONE)
     }
 }
 impl From<Natural> for Fraction {
     fn from(n: Natural) -> Fraction {
-        Fraction::new_from_big_ints(&Integer::from(&n), &Integer::from(1))
+        Fraction::new_from_big_ints(&Integer::from(&n), &INT_ONE)
     }
 }
 //from Rational
@@ -1285,6 +1403,53 @@ impl Matrix {
         })
     }
 
+    // Compute the mean of all elements in the matrix
+    pub fn mean(&self) -> Result<Fraction, String> {
+        let sum: Fraction = self.data.iter().cloned().sum();
+        let count = Fraction::from((self.rows * self.cols) as i32);
+        Ok(sum.divide(&count))
+    }
+
+    // Compute the median of all elements in the matrix
+    pub fn median(&self) -> Result<Fraction, String> {
+        let mut sorted_data = self.data.clone();
+        sorted_data.sort();
+        let mid = sorted_data.len() / 2;
+        if sorted_data.len() % 2 == 0 {
+            let median = (&sorted_data[mid - 1] + &sorted_data[mid]).divide(&Fraction::from(2));
+            Ok(median)
+        } else {
+            Ok(sorted_data[mid].clone())
+        }
+    }
+
+    // Compute the mode of all elements in the matrix
+    pub fn mode(&self) -> Result<Fraction, String> {
+        let mut occurrences = std::collections::HashMap::new();
+        for value in &self.data {
+            *occurrences.entry(value).or_insert(0) += 1;
+        }
+        let max_occurrences = occurrences.values().max().ok_or("No mode found")?.clone();
+        let mode = occurrences
+            .into_iter()
+            .filter(|&(_, v)| v == max_occurrences)
+            .map(|(k, _)| k)
+            .next()
+            .ok_or("No mode found")?
+            .clone();
+        Ok(mode)
+    }
+
+    // Compute the sum of all elements in the matrix
+    pub fn sum(&self) -> Fraction {
+        self.data.iter().cloned().sum()
+    }
+
+    // Compute the product of all elements in the matrix
+    pub fn prod(&self) -> Fraction {
+        self.data.iter().cloned().fold(Fraction::from(1), |acc, x| acc * x)
+    }
+
     // Compute inverse using adjugate matrix divided by determinant
     pub fn inverse(&self) -> Result<Matrix, String> {
         let det = self.determinant()?;
@@ -1299,7 +1464,7 @@ impl Matrix {
             }
         }
         
-        Ok(adjugate.scale(&(Fraction::from(1) / det)))
+        Ok(adjugate.scale(&(&FRAC_ONE.divide(&det))))
     }
 
     // Compute cofactor recursively 
@@ -1322,7 +1487,7 @@ impl Matrix {
     fn minor(&self, row: usize, col: usize) -> Result<Fraction, String> {
 
         if self.rows == 1 {
-            return Ok(Fraction::from(1));
+            return Ok(FRAC_ONE.clone());
         }
 
         let mut submatrix = Vec::new();
@@ -1981,7 +2146,7 @@ mod tests {
 
 //     const MAX_LOOP_TIMES: i64 = 500;
 //     let STOP_AFTER: Fraction = Fraction::new_from_big_ints(
-//         &Integer::from(1),
+//         &INT_ONE,
 //         &Integer::from(PRECISION).pow(PRECISION as u64 / 10),
 //     );
 
@@ -1990,7 +2155,7 @@ mod tests {
 //     for i in 0..MAX_LOOP_TIMES {
 //         let this_term = last_term.multiply(
 //             &Fraction::from(i)
-//                 .multiply(&Fraction::from(1).subtract(&frac))
+//                 .multiply(&FRAC_ONE.subtract(&frac))
 //                 .divide(&Fraction::from(i + 1)),
 //         );
 
@@ -2005,7 +2170,7 @@ mod tests {
 //     }
 //     Ok(sum
 //         .added_to(&scale_big)
-//         .added_to(&Fraction::from(scale_small).divide(&Fraction::from(2)))
+//         .added_to(&Fraction::from(scale_small).divide(&FRAC_TWO))
 //         .trimed(PRECISION))
 // }
 
@@ -2049,5 +2214,5 @@ mod tests {
 //     //     self.divide(&Fraction::new(divisor, 1))
 //     // );
 //     return (self.divide(&Fraction::new(divisor, 1)).exp()).pow(&Integer::from(divisor));
-//     //return self.divide(&Fraction::from(2)).exp().pow(&Integer::from(2));
+//     //return self.divide(&FRAC_TWO).exp().pow(&INT_TWO);
 // }
