@@ -542,61 +542,54 @@ impl Fraction {
     //   thisterm  = X ;  and stop when thisterm < precision used.
     //           0                              n
     //
-    //   If abs(x) > 0.85 then an alternate form is used (probably not faster for me since it uses this function anyway)
-    //      asin(x/sqrt(1+x^2))
+    //   If abs(x) > 0.9 then an alternate form is used
+    //      atan(x) = 2 * atan((√(1 + x²) - 1) / x)
     //
-    //   And if abs(x) > 2.0 then this form is used.
+    //   And if abs(x) > 1.0 then this form is used.
     //   pi/2 - atan(1/x)
-    // TODO: fix slightly undershooting answer
+    // Changed slightly from the microsoft implementation
     // https://en.wikipedia.org/wiki/Horner's_method
     pub fn atan(&self, precision: u32) -> Result<Fraction, String> {
         if self.value < 0.0 {
             return Ok(Self::atan(&self.negate(), precision)?.negate());
         }
 
-        if self.abs().value > 0.85 { // TODO: replace/remove this
-            return Ok(Self::asin(&self.divide(&FRAC_ONE.added_to(&self.pow(&INT_TWO, precision)?).nth_root(&FRAC_TWO, precision)?), precision)?);
+        if self.value > 1 {
+            return Ok(Self::pi()
+                .divide(&FRAC_TWO)
+                .subtract(&Self::atan(&self.recip(), precision)?));
         }
 
-        if self.abs() > FRAC_TWO {
-            return Ok(Self::pi().divide(&FRAC_TWO).subtract(&Self::atan(&self.recip(), precision)?));
+        if self.value > 0.9 {
+            let x_squared = self.multiply(self).trimed(precision);
+            let inner = x_squared.added_to(&FRAC_ONE).nth_root(&FRAC_TWO, precision)?
+                .subtract(&FRAC_ONE)
+                .divide(self);
+            let res = Ok((&Self::atan(&inner, precision)?).multiply(&FRAC_TWO).trimed(precision));
+            return res
         }
 
         const MAX_LOOP_TIMES: i64 = 500;
-        let STOP_AFTER: Fraction = Fraction::new_from_big_ints(
+        let STOP_AFTER: Fraction = Self::new_from_big_ints(
             &INT_ONE,
-            &Integer::from(precision).pow(precision as u64 / 10),
+            &Integer::from(10).pow(precision as u64 + 5),
         );
 
-        let x_squared = self.pow(&INT_TWO, precision)?;
+        let mut sum = Fraction::zero();
+        let mut term = self.clone();
 
-        let mut last_term = self.clone();
-        let mut sum = self.clone();
-        let mut sign = Fraction::from(-1);
+        for n in 1..=MAX_LOOP_TIMES {
+            sum = sum.added_to(&term.divide(&Fraction::from(2 * n - 1)));
+            term = term.negate().multiply(&self).multiply(self);
+            term.trim(precision);
+            sum.trim(precision);
 
-        for j in 1..MAX_LOOP_TIMES {
-            let j2 = Fraction::from(j*2);
-
-            let this_term = last_term
-                .multiply(&j2.multiply(&x_squared)).multiply(&sign)
-                .divide(&j2.added_to(&FRAC_TWO)).trimed(precision);
-
-            println!("{}",&sum.to_string_decimal(15));
-            // add this term to the sum
-            sum = sum.added_to(&this_term);
-
-            // check if the term is small enough
-            if this_term.abs() < STOP_AFTER {
+            if term.abs() < STOP_AFTER {
                 break;
             }
-
-            // update the last term
-            last_term = this_term;
-            sign = sign.negate();
-
-            // trim the sum to the required precision
-            sum.trim(precision);
         }
+
+        sum.trim(precision);
 
         Ok(sum)
     }
