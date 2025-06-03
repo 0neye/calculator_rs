@@ -5,9 +5,13 @@ pub mod tokenizer;
 
 use evaluator::SymbolTable;
 use evaluator::EvalResult;
-use fieri::{
-    completion::{create, CompletionParamBuilder},
-    Client, Error,
+use async_openai::{
+    config::OpenAIConfig,
+    types::{
+        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
+        CreateChatCompletionRequestArgs,
+    },
+    Client, error::OpenAIError,
 };
 use std::{env, io::{BufRead, Write}};
 
@@ -93,18 +97,16 @@ fn get_api_key() -> Result<String, String> {
 }
 
 /// Uses OpenAI API to evaluate a query into an expression
-async fn evaluate_query(query: String) -> Result<String, Error> {
-    let key = match get_api_key() {
-        Ok(key) => key,
+async fn evaluate_query(query: String) -> Result<String, OpenAIError> {
+    let config = match get_api_key() {
+        Ok(key) => OpenAIConfig::new().with_api_key(key),
         Err(err) => {
             println!("{}", err);
-            return Ok("".to_string());
+            return Ok(String::new());
         }
     };
-
-    let client = Client::new(key);
-    let prompt = format!(
-"Usage: [expression] [options]
+    let client = Client::with_config(config);
+    let system_prompt = "Usage: [expression] [options]
 
     Expression syntax:
         operators: +, -, *, /, ^, !
@@ -170,31 +172,32 @@ Variable: b = 1000000000
 Syntax Notes:
 - Commas in numbers are not supported. Replace them with backticks.
 - Implicit multiplication is supported, but only use it with the provided constants for clarity (like k for thousand).
-- Matrices have limited support. Destructive functions can be declared like 'abs_all([x]) = abs(x)' and will apply to all values in an input matrix.
+- Matrices have limited support. Destructive functions can be declared like 'abs_all([x]) = abs(x)' and will apply to all values in an input matrix.";
 
-Below is the query:
-<QUERY>
-{}
-</QUERY>
-", query.trim()
-    );
-    let params = CompletionParamBuilder::new("text-davinci-003")
-        .prompt(prompt)
-        .max_tokens(35)
+    let request = CreateChatCompletionRequestArgs::default()
+        .model("gpt-4.1-mini")
+        .messages([
+            ChatCompletionRequestSystemMessageArgs::default()
+                .content(system_prompt)
+                .build()?
+                .into(),
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(query.trim())
+                .build()?
+                .into(),
+        ])
+        .max_tokens(35u32)
         .temperature(0.4)
-        .top_p(1.0)
-        .frequency_penalty(0.0)
-        .presence_penalty(0.0)
         .build()?;
-
-    let response = create(&client, &params).await?.choices[0]
-        .text
-        .as_ref()
-        .unwrap()
+    let response = client.chat().create(request).await?;
+    let text = response
+        .choices
+        .first()
+        .and_then(|c| c.message.content.clone())
+        .unwrap_or_default()
         .trim()
         .to_string();
-
-    Ok(response)
+    Ok(text)
 }
 
 // the help menu
